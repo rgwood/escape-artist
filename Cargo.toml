@@ -3,7 +3,7 @@ name = "escape-artist"
 description = "A visualizer for terminal escape sequences"
 homepage = "https://github.com/rgwood/escape-artist"
 repository = "https://github.com/rgwood/escape-artist"
-version = "0.1.0"
+version = "0.5.0"
 edition = "2021"
 license = "MIT"
 

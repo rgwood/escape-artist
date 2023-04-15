@@ -79,7 +79,12 @@ fn main() -> Result<()> {
     terminal::enable_raw_mode()?;
 
     let mut stdin = std::io::stdin();
-    let command = CommandBuilder::new(shell_path);
+
+    let mut command = CommandBuilder::new(shell_path);
+    if let Ok(cwd) = std::env::current_dir() {
+        command.cwd(cwd);
+    }
+
     let child = pair.slave.spawn_command(command)?;
     // This reads output (stderr and stdout multiplexed into 1 stream) from child
     let mut reader = pair.master.try_clone_reader()?;

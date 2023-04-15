@@ -1,0 +1,45 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Escape Artist</title>
+  <link rel="icon" href="/favicon.ico">
+</head>
+
+<body class="flex flex-col bg-slate-900 font-mono text-gray-50 p-2 w-screen">
+  <script src="/tailwindplay.js"></script>
+  <!-- <script src="https://cdn.tailwindcss.com/3.3.1"></script> -->
+
+  <a href="/" class="bg-slate-800 hover:bg-cyan-900 p-0 font-bold rounded-sm border border-slate-400 m-2 px-1 text-center fixed top-0 right-0">Back</a>
+  <div class="self-center max-w-3xl flex flex-col space-y-2">
+	  <h1 class="self-center mb-1 text-lg font-bold font-sans">Escape Artist Help</h1>
+	  <p>
+		Hello! This is the help page for <a href="https://github.com/rgwood/" class="underline text-blue-300">Escape Artist</a>,
+		a little tool for visualizing ANSI escape codes in terminal applications.
+	  </p>
+	  <br/>
+	  <br/>
+	  <p><span class="font-bold text-xl">Q:</span> What are ANSI escape codes?</p>
+	  <p><span class="font-bold text-xl">A:</span> "Invisible" byte sequences that are printed by console
+		 applications to stdout and stderr, then interpreted by your terminal emulator. For example, an escape code might tell the terminal to paint all text <span class="text-green-300">green</span> until further notice. There are several kinds of escape sequences, <a href="https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797" class="underline text-blue-300">this page</a> is a great reference.
+		</p>
+	  <br/>
+	  <br/>
+	  <p><span class="font-bold text-xl">Q:</span> What does Escape Artist do?</p>
+	  <p><span class="font-bold text-xl">A:</span> It launches your shell in a <a class="underline text-blue-300" href="https://devblogs.microsoft.com/commandline/windows-command-line-introducing-the-windows-pseudo-console-conpty/#enter-the-pseudo-terminal-pty"> pseudoterminal</a> (AKA a pty) and starts a web interface where you can view the output of the shell with escape sequences made visible. You can mouse over individual escape codes to see their raw bytes and (sometimes) a description of what the escape code does.</p>
+
+	  <br/>
+	  <br/>
+	  <p><span class="font-bold text-xl">Q:</span> Why is this useful?</p>
+	  <p><span class="font-bold text-xl">A:</span> It's kinda like View Source for the terminal. Maybe you're curious about what your shell is doing to render your cool new prompt. Maybe you work on a shell or a TUI application and you need to debug it.</p>
+
+	  <br/>
+	  <br/>
+	  <p><span class="font-bold text-xl">Q:</span> How can I configure Escape Artist?</p>
+	  <p><span class="font-bold text-xl">A:</span> Run Escape Artist with the <code class="border rounded-sm px-1 bg-slate-800">-h</code> or <code class="border rounded-sm px-1 bg-slate-800">--help</code> flag to see all possible options.</p>
+  </div>
+</body>
+</html>
+

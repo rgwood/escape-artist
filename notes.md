@@ -75,6 +75,7 @@ Next steps: get the recording streaming to a web UI, identify ANSI control chars
 
 TO DO
 
+- [ ] use a nerd font
 - [ ] handle tab/spaces better
   - should show \t inline or turn it into multiple spaces
   - leading spaces should indent lines

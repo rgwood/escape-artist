@@ -492,15 +492,30 @@ fn csi_front_end(
         .join(";");
     ascii.push(*c);
 
-    let tooltip: Option<String> = match ascii.as_str() {
+    // TODO: need to do more sophisticated matching on individual params, not the final string
+    // ex: should support both 1;31m and 31;1m for bold red text
+    #[allow(unused_assignments)]
+    let mut tooltip = None;
+    // Select Graphic Rendition https://stackoverflow.com/a/33206814/
+    // if *c == 'm' {
+    // }
+    // 🙈🤠
+    tooltip = match ascii.as_str() {
         "30m" => Some("Set foreground color to black".into()),
         "31m" => Some("Set foreground color to red".into()),
+        "1;31m" => Some("Set foreground color to bold red".into()),
         "32m" => Some("Set foreground color to green".into()),
+        "1;32m" => Some("Set foreground color to bold green".into()),
         "33m" => Some("Set foreground color to yellow".into()),
+        "1;33m" => Some("Set foreground color to bold yellow".into()),
         "34m" => Some("Set foreground color to blue".into()),
+        "1;34m" => Some("Set foreground color to bold blue".into()),
         "35m" => Some("Set foreground color to magenta".into()),
+        "1;35m" => Some("Set foreground color to bold magenta".into()),
         "36m" => Some("Set foreground color to cyan".into()),
+        "1;36m" => Some("Set foreground color to bold cyan".into()),
         "37m" => Some("Set foreground color to white".into()),
+        "1;37m" => Some("Set foreground color to bold white".into()),
         "39m" => Some("Set foreground color to default".into()),
         "0m" => Some("Reset all modes (styles and colours)".into()),
         "2004h" => Some("Enable bracketed paste mode".into()),

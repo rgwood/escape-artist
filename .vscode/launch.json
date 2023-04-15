@@ -7,15 +7,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'visjam'",
+            "name": "Debug executable 'escape-artist'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=visjam",
-                    "--package=visjam"
+                    "--bin=escape-artist",
+                    "--package=escape-artist"
                 ],
                 "filter": {
-                    "name": "visjam",
+                    "name": "escape-artist",
                     "kind": "bin"
                 }
             },
@@ -25,16 +25,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'visjam'",
+            "name": "Debug unit tests in executable 'escape-artist'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=visjam",
-                    "--package=visjam"
+                    "--bin=escape-artist",
+                    "--package=escape-artist"
                 ],
                 "filter": {
-                    "name": "visjam",
+                    "name": "escape-artist",
                     "kind": "bin"
                 }
             },

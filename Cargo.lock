@@ -333,7 +333,7 @@ dependencies = [
 
 [[package]]
 name = "escape-artist"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -344,6 +344,7 @@ dependencies = [
  "mime_guess",
  "open",
  "portable-pty",
+ "rand",
  "rust-embed",
  "serde",
  "serde_json",

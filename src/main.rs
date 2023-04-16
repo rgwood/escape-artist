@@ -4,7 +4,7 @@ use std::{
     net::SocketAddr,
     sync::Arc,
     thread,
-    time::Duration,
+    time::Duration, path::PathBuf,
 };
 
 use anyhow::Result;
@@ -23,6 +23,7 @@ use clap::Parser;
 use crossterm::{cursor, execute, style::Stylize, terminal};
 use itertools::Itertools;
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+use rand::seq::SliceRandom;
 use rust_embed::RustEmbed;
 use serde::Serialize;
 use tokio::{
@@ -55,6 +56,16 @@ fn main() -> Result<()> {
         None => std::env::var("SHELL")?,
     };
 
+    const EMOJI_POOL: [&str; 10] = ["🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🤔"];
+    let random_emoji = *EMOJI_POOL.choose(&mut rand::thread_rng()).unwrap();
+    println!("{}{}{}{} {}",
+        "Launching ".cyan(),
+        PathBuf::from(&shell_path).file_name().expect("get file name").to_string_lossy().magenta(),
+        " in Escape Artist v".cyan(),
+        env!("CARGO_PKG_VERSION").cyan(),
+        random_emoji,
+    );
+
     let _clean_up = CleanUp;
     let all_events: Arc<Mutex<Vec<VteEvent>>> = Arc::new(Mutex::new(vec![]));
     let (tx, _) = broadcast::channel::<VteEventDto>(10000); // capacity arbitrarily chosen
@@ -72,11 +83,12 @@ fn main() -> Result<()> {
     })?;
 
     println!(
-        "{} {} {}",
-        "Connect to".cyan(),
+        "{}{}{}",
+        "Open ".cyan(),
         format!("http://localhost:{}", &cli.port).magenta(),
-        "to view terminal escape codes!".cyan()
+        " to view terminal escape codes, type CTRL+D to exit".cyan()
     );
+    println!();
     terminal::enable_raw_mode()?;
 
     let mut stdin = std::io::stdin();

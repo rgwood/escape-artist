@@ -16,10 +16,10 @@ https://poor.dev/blog/terminal-anatomy/
 
 # TO DO
 
-- [ ] use a nerd font
 - [ ] handle tab/spaces better
   - should show \t inline or turn it into multiple spaces
   - leading spaces should indent lines
+- [x] use a nerd font
 - [x] handle failure to get a socket with a nicer error message
 - [x] print stack trace automatically
 - [ ] handle left arrow cursor movement better, currently reported as "Execute "

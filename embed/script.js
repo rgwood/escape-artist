@@ -22,7 +22,7 @@ function Event(props) {
   const shared_classes = "w-fit border rounded-sm px-1 m-1 bg-slate-800"
   switch (dto.type) {
     case "Print":
-      return html`${dto.string}`;
+      return html`<span>${dto.string}</span>`;
     case "GenericEscape": {
       let border = !!dto.tooltip ? "border-blue-400" : "border-slate-400";
 

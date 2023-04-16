@@ -48,6 +48,7 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
+    initialize_environment();
     let cli = Cli::parse();
     let shell_path = match cli.shell {
         Some(s) => s,
@@ -144,7 +145,7 @@ fn main() -> Result<()> {
         axum::Server::bind(&addr)
             .serve(app.into_make_service())
             .await
-            .unwrap();
+            .expect("Failed to bind to socket. Maybe another service is already using the same port");
     });
 
     let mut child_stdin = pair.master.take_writer()?;
@@ -164,6 +165,16 @@ fn main() -> Result<()> {
             return Ok(());
         }
     }
+}
+
+fn initialize_environment() {
+    std::env::set_var("RUST_BACKTRACE", "1");
+    let default_panic = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        terminal::disable_raw_mode().expect("Could not disable raw mode");
+        execute!(stdout(), cursor::SetCursorStyle::DefaultUserShape).unwrap();
+        default_panic(info);
+    }));
 }
 
 fn _print_all_events(vte_rx: &Vec<VteEvent>) {

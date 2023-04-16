@@ -20,6 +20,8 @@ https://poor.dev/blog/terminal-anatomy/
 - [ ] handle tab/spaces better
   - should show \t inline or turn it into multiple spaces
   - leading spaces should indent lines
+- [x] handle failure to get a socket with a nicer error message
+- [x] print stack trace automatically
 - [ ] handle left arrow cursor movement better, currently reported as "Execute "
 - [ ] show raw bytes for line breaks
 - [x] embed all js libs so it works offline

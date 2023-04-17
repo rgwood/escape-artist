@@ -23,8 +23,7 @@ clap = { version = "4.2.1", features = ["derive"] }
 itertools = "0.10.5"
 rust-embed = { version = "6.6.1", features = ["axum-ex"] }
 mime_guess = "2.0.4"
-open = "4.0.1"
-is-wsl = "0.4.0"
+open = "4.0.2"
 rand = "0.8.5"
 
 [profile.release]

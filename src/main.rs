@@ -146,12 +146,7 @@ fn main() -> Result<()> {
             .with_state(cloned_state);
 
         let url = format!("http://localhost:{}", cli.port);
-        if is_wsl::is_wsl() {
-            // workaround for open-rs bug where it tries to open in `gio` even on wsl
-            let _ = open::with(url, "wslview");
-        } else {
-            let _ = open::that(url);
-        }
+        let _ = open::that(url);
 
         let addr = SocketAddr::from(([127, 0, 0, 1], cli.port));
         axum::Server::bind(&addr)

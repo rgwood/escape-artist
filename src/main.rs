@@ -622,7 +622,7 @@ where
 // TODO: polish this until it's useful as interactive documentation for VTE
 // maybe use insta for snapshot tests
 #[test]
-fn first_test() -> Result<()> {
+fn set_bold() -> Result<()> {
     let all_events: Arc<Mutex<Vec<VteEvent>>> = Arc::new(Mutex::new(vec![]));
     let (tx, _) = broadcast::channel::<VteEventDto>(10000); // capacity arbitrarily chosen
     let state = AppState { all_events, tx };
@@ -633,7 +633,7 @@ fn first_test() -> Result<()> {
     };
 
     let esc = [b'\x1b'];
-    let input = "[1m";
+    let input = "[1ma";
     let combined = esc.iter().chain(input.as_bytes());
 
     let mut statemachine = vte::Parser::new();
@@ -643,7 +643,9 @@ fn first_test() -> Result<()> {
         statemachine.advance(&mut performer, *byte);
     }
 
-    dbg!(&state.all_events);
-    todo!();
+    let events = state.all_events.blocking_lock();
+    let cloned = events.clone(); // having trouble serializing things behind a mutex guard
+    insta::assert_yaml_snapshot!(cloned);
+
     Ok(())
 }

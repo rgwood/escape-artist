@@ -2,9 +2,10 @@ use std::{
     io::Read,
     io::{stdout, Write},
     net::SocketAddr,
+    path::PathBuf,
     sync::Arc,
     thread,
-    time::Duration, path::PathBuf,
+    time::Duration,
 };
 
 use anyhow::Result;
@@ -58,9 +59,14 @@ fn main() -> Result<()> {
 
     const EMOJI_POOL: [&str; 10] = ["🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🤔"];
     let random_emoji = *EMOJI_POOL.choose(&mut rand::thread_rng()).unwrap();
-    println!("{}{}{}{} {}",
+    println!(
+        "{}{}{}{} {}",
         "Launching ".cyan(),
-        PathBuf::from(&shell_path).file_name().expect("get file name").to_string_lossy().magenta(),
+        PathBuf::from(&shell_path)
+            .file_name()
+            .expect("get file name")
+            .to_string_lossy()
+            .magenta(),
         " in Escape Artist v".cyan(),
         env!("CARGO_PKG_VERSION").cyan(),
         random_emoji,
@@ -102,10 +108,10 @@ fn main() -> Result<()> {
     // This reads output (stderr and stdout multiplexed into 1 stream) from child
     let mut reader = pair.master.try_clone_reader()?;
 
-    // Watch the child's output, responding to escape codes and writing all output to disk
+    // Watch the child's output, pump it into the VTE parser/performer, and forward it to the terminal
     let cloned_state = state.clone();
     thread::spawn(move || -> Result<()> {
-        let mut performer = VteLog {
+        let mut performer = Performer {
             curr_cmd_bytes: Vec::new(),
             state: cloned_state,
         };
@@ -152,7 +158,9 @@ fn main() -> Result<()> {
         axum::Server::bind(&addr)
             .serve(app.into_make_service())
             .await
-            .expect("Failed to bind to socket. Maybe another service is already using the same port");
+            .expect(
+                "Failed to bind to socket. Maybe another service is already using the same port",
+            );
     });
 
     let mut child_stdin = pair.master.take_writer()?;
@@ -307,12 +315,12 @@ impl Drop for CleanUp {
     }
 }
 
-struct VteLog {
+struct Performer {
     curr_cmd_bytes: Vec<u8>,
     state: AppState,
 }
 
-impl VteLog {
+impl Performer {
     fn log(&mut self, event: VteEvent) {
         let _ = self.state.tx.send(VteEventDto::from(&event)); // this will fail if there's nobody listening yet, and that's OK
         self.state.all_events.blocking_lock().push(event);
@@ -320,7 +328,7 @@ impl VteLog {
     }
 }
 
-impl Perform for VteLog {
+impl Perform for Performer {
     fn print(&mut self, c: char) {
         self.log(VteEvent::Print { c });
     }
@@ -609,4 +617,33 @@ where
                 .unwrap(),
         }
     }
+}
+
+// TODO: polish this until it's useful as interactive documentation for VTE
+// maybe use insta for snapshot tests
+#[test]
+fn first_test() -> Result<()> {
+    let all_events: Arc<Mutex<Vec<VteEvent>>> = Arc::new(Mutex::new(vec![]));
+    let (tx, _) = broadcast::channel::<VteEventDto>(10000); // capacity arbitrarily chosen
+    let state = AppState { all_events, tx };
+
+    let mut performer = Performer {
+        curr_cmd_bytes: Vec::new(),
+        state: state.clone(),
+    };
+
+    let esc = [b'\x1b'];
+    let input = "[1m";
+    let combined = esc.iter().chain(input.as_bytes());
+
+    let mut statemachine = vte::Parser::new();
+
+    for byte in combined {
+        performer.curr_cmd_bytes.push(*byte);
+        statemachine.advance(&mut performer, *byte);
+    }
+
+    dbg!(&state.all_events);
+    todo!();
+    Ok(())
 }

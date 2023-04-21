@@ -2,9 +2,10 @@ use std::{
     io::Read,
     io::{stdout, Write},
     net::SocketAddr,
+    path::PathBuf,
     sync::Arc,
     thread,
-    time::Duration, path::PathBuf,
+    time::Duration,
 };
 
 use anyhow::Result;
@@ -58,9 +59,14 @@ fn main() -> Result<()> {
 
     const EMOJI_POOL: [&str; 10] = ["🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🤔"];
     let random_emoji = *EMOJI_POOL.choose(&mut rand::thread_rng()).unwrap();
-    println!("{}{}{}{} {}",
+    println!(
+        "{}{}{}{} {}",
         "Launching ".cyan(),
-        PathBuf::from(&shell_path).file_name().expect("get file name").to_string_lossy().magenta(),
+        PathBuf::from(&shell_path)
+            .file_name()
+            .expect("get file name")
+            .to_string_lossy()
+            .magenta(),
         " in Escape Artist v".cyan(),
         env!("CARGO_PKG_VERSION").cyan(),
         random_emoji,
@@ -152,7 +158,9 @@ fn main() -> Result<()> {
         axum::Server::bind(&addr)
             .serve(app.into_make_service())
             .await
-            .expect("Failed to bind to socket. Maybe another service is already using the same port");
+            .expect(
+                "Failed to bind to socket. Maybe another service is already using the same port",
+            );
     });
 
     let mut child_stdin = pair.master.take_writer()?;
@@ -488,12 +496,26 @@ impl From<&VteEvent> for VteEventDto {
                 c,
                 raw_bytes,
             } => csi_front_end(params, intermediates, ignore, c, raw_bytes),
-            VteEvent::EscDispatch { raw_bytes, .. } => VteEventDto::GenericEscape {
-                title: "Escape".into(),
-                tooltip: None,
-                raw_bytes: sanitize_raw_bytes(raw_bytes),
-            },
+            VteEvent::EscDispatch {
+                byte, raw_bytes, ..
+            } => other_escape_front_end(byte, raw_bytes),
         }
+    }
+}
+
+fn other_escape_front_end(byte: &u8, raw_bytes: &Vec<u8>) -> VteEventDto {
+    let c = char::from(*byte);
+    let (title, tooltip) = match c {
+        'c' => ("RIS".into(), Some("Reset to initial state".into())),
+        '7' => ("DECSC".into(), Some("Save Cursor Position".into())),
+        '8' => ("DECRC".into(), Some("Restore Cursor Position".into())),
+        _ => ("Other".into(), None),
+    };
+
+    VteEventDto::GenericEscape {
+        title,
+        tooltip,
+        raw_bytes: sanitize_raw_bytes(raw_bytes),
     }
 }
 
@@ -510,40 +532,161 @@ fn csi_front_end(
         .join(";");
     ascii.push(*c);
 
-    // TODO: need to do more sophisticated matching on individual params, not the final string
-    // ex: should support both 1;31m and 31;1m for bold red text
-    #[allow(unused_assignments)]
     let mut tooltip = None;
+
     // Select Graphic Rendition https://stackoverflow.com/a/33206814/
-    // if *c == 'm' {
-    // }
-    // 🙈🤠
-    tooltip = match ascii.as_str() {
-        "30m" => Some("Set foreground color to black".into()),
-        "31m" => Some("Set foreground color to red".into()),
-        "1;31m" => Some("Set foreground color to bold red".into()),
-        "32m" => Some("Set foreground color to green".into()),
-        "1;32m" => Some("Set foreground color to bold green".into()),
-        "33m" => Some("Set foreground color to yellow".into()),
-        "1;33m" => Some("Set foreground color to bold yellow".into()),
-        "34m" => Some("Set foreground color to blue".into()),
-        "1;34m" => Some("Set foreground color to bold blue".into()),
-        "35m" => Some("Set foreground color to magenta".into()),
-        "1;35m" => Some("Set foreground color to bold magenta".into()),
-        "36m" => Some("Set foreground color to cyan".into()),
-        "1;36m" => Some("Set foreground color to bold cyan".into()),
-        "37m" => Some("Set foreground color to white".into()),
-        "1;37m" => Some("Set foreground color to bold white".into()),
-        "39m" => Some("Set foreground color to default".into()),
-        "0m" => Some("Reset all modes (styles and colours)".into()),
-        "2004h" => Some("Enable bracketed paste mode".into()),
-        _ => None,
-    };
+    if *c == 'm' {
+        tooltip = sgr(params);
+    } else if *c == 'n' {
+        // TODO: handle Query Cursor Position
+    }
 
     VteEventDto::GenericEscape {
         title: format!("CSI {ascii}"),
         tooltip,
         raw_bytes: sanitize_raw_bytes(raw_bytes),
+    }
+}
+
+// Select Graphic Rendition https://stackoverflow.com/a/33206814/
+fn sgr(params: &[Vec<u16>]) -> Option<String> {
+    let mut foreground_colors: Vec<String> = vec![];
+    let mut background_colors: Vec<String> = vec![];
+    let mut attributes: Vec<String> = vec![];
+
+    // this iterator returns items of Vec<u16>
+    // the first item in the vec is the parameter, later items are subparameters
+    // however, I believe that the VTE crate only attaches subparameters if they are separated with a colon...
+    // and in practice most applications separate subparameters with semicolons
+    let mut iter = params.iter().peekable();
+
+    loop {
+        //
+        let Some (param) = iter.next() else {
+            break;
+        };
+
+        match param[0] {
+            0 => return Some("Reset all modes (styles and colours)".into()),
+            1 => attributes.push("bold".into()),
+            2 => attributes.push("dim".into()),
+            3 => attributes.push("italic".into()),
+            4 => attributes.push("underline".into()),
+            5 => attributes.push("blink".into()),
+            7 => attributes.push("reverse".into()),
+            8 => attributes.push("hidden".into()),
+            9 => attributes.push("strikethrough".into()),
+            30 => foreground_colors.push("black".into()),
+            31 => foreground_colors.push("red".into()),
+            32 => foreground_colors.push("green".into()),
+            33 => foreground_colors.push("yellow".into()),
+            34 => foreground_colors.push("blue".into()),
+            35 => foreground_colors.push("magenta".into()),
+            36 => foreground_colors.push("cyan".into()),
+            37 => foreground_colors.push("white".into()),
+            38 => {
+                // Set foreground colour to a custom value
+                // This is a little tricky because, as I understand it, the subparameters following 38
+                // can be separated by either ; or : and that will affect whether VTE parses them as parameters or subparameters
+                // https://wezfurlong.org/wezterm/escape-sequences.html#graphic-rendition-sgr
+                // TODO: handle : subparameters
+
+                foreground_colors.push("custom value".into());
+
+                if let Some(next) = iter.peek() {
+                    if next[0] == 5 {
+                        // Next arguments are `5;<n>`
+                        iter.next();
+                        iter.next();
+                    } else if next[0] == 2 {
+                        // Next arguments are `2;<r>;<g>;<b>`
+                        iter.next();
+                        iter.next();
+                        iter.next();
+                        iter.next();
+                    }
+                }
+            }
+            39 => foreground_colors.push("default".into()),
+            40 => background_colors.push("black".into()),
+            41 => background_colors.push("red".into()),
+            42 => background_colors.push("green".into()),
+            43 => background_colors.push("yellow".into()),
+            44 => background_colors.push("blue".into()),
+            45 => background_colors.push("magenta".into()),
+            46 => background_colors.push("cyan".into()),
+            47 => background_colors.push("white".into()),
+            48 => {
+                // Set background colour to a custom value
+                // This is a little tricky because, as I understand it, the subparameters following 48
+                // can be separated by either ; or : and that will affect whether VTE parses them as parameters or subparameters
+                // https://wezfurlong.org/wezterm/escape-sequences.html#graphic-rendition-sgr
+                // TODO: handle : subparameters
+
+                background_colors.push("custom value".into());
+
+                if let Some(next) = iter.peek() {
+                    if next[0] == 5 {
+                        // Next arguments are `5;<n>`
+                        iter.next();
+                        iter.next();
+                    } else if next[0] == 2 {
+                        // Next arguments are `2;<r>;<g>;<b>`
+                        iter.next();
+                        iter.next();
+                        iter.next();
+                        iter.next();
+                    }
+                }
+            }
+            49 => background_colors.push("default".into()),
+            90 => foreground_colors.push("bright black".into()),
+            91 => foreground_colors.push("bright red".into()),
+            92 => foreground_colors.push("bright green".into()),
+            93 => foreground_colors.push("bright yellow".into()),
+            94 => foreground_colors.push("bright blue".into()),
+            95 => foreground_colors.push("bright magenta".into()),
+            96 => foreground_colors.push("bright cyan".into()),
+            97 => foreground_colors.push("bright white".into()),
+            100 => background_colors.push("bright black".into()),
+            101 => background_colors.push("bright red".into()),
+            102 => background_colors.push("bright green".into()),
+            103 => background_colors.push("bright yellow".into()),
+            104 => background_colors.push("bright blue".into()),
+            105 => background_colors.push("bright magenta".into()),
+            106 => background_colors.push("bright cyan".into()),
+            107 => background_colors.push("bright white".into()),
+            _ => continue,
+        }
+    }
+
+    let mut tooltip = String::new();
+
+    if !attributes.is_empty() {
+        tooltip.push_str(&format!(
+            "Set text attributes to {}. ",
+            attributes.join(", ")
+        ));
+    }
+
+    if !foreground_colors.is_empty() {
+        tooltip.push_str(&format!(
+            "Set foreground color to {}. ",
+            foreground_colors.join(", ")
+        ));
+    }
+
+    if !background_colors.is_empty() {
+        tooltip.push_str(&format!(
+            "Set background color to {}. ",
+            background_colors.join(", ")
+        ));
+    }
+
+    if tooltip.is_empty() {
+        None
+    } else {
+        Some(tooltip)
     }
 }
 
@@ -581,7 +724,7 @@ fn osc_front_end(
 fn sanitize_raw_bytes(raw_bytes: &[u8]) -> String {
     let ret = String::from_utf8_lossy(raw_bytes);
     // TODO: there's gotta be a better way to do this than a line for every interesting control char
-    let ret = ret.replace("", r"\0x1b");
+    let ret = ret.replace("", r"\x1b");
     ret
 }
 

@@ -11,7 +11,7 @@ use std::{
     time::Duration,
 };
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use axum::{
     body::{boxed, BoxBody, Full},
     extract::{
@@ -30,7 +30,6 @@ use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use rand::seq::SliceRandom;
 use rust_embed::RustEmbed;
 use serde::Serialize;
-use signal_hook::consts::SIGWINCH;
 use tokio::{
     sync::{broadcast, Mutex},
     time::{timeout_at, Instant},
@@ -56,13 +55,21 @@ struct Cli {
 fn main() -> Result<()> {
     initialize_environment();
     let resize_signaled = Arc::new(AtomicBool::new(false));
+
     // No SIGWINCH on Windows, but it seems like there's no great alternative: https://github.com/microsoft/terminal/issues/281
-    let _ = signal_hook::flag::register(SIGWINCH, resize_signaled.clone());
+    #[cfg(not(windows))]
+    {
+        use signal_hook::consts::SIGWINCH;
+        let _ = signal_hook::flag::register(SIGWINCH, resize_signaled.clone());
+    }
 
     let cli = Cli::parse();
-    let shell_path = match cli.shell {
-        Some(s) => s,
-        None => std::env::var("SHELL")?,
+    let shell_path = if let Some(s) = cli.shell {
+        s
+    } else if let Ok(path) = std::env::var("SHELL") {
+        path
+    } else {
+        bail!("SHELL environment variable not found; either set it or use --shell")
     };
 
     const EMOJI_POOL: [&str; 10] = ["🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🤔"];

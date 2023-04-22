@@ -392,7 +392,6 @@ impl Perform for Performer {
 
 // These all map directly to their equivalent events in the `vte` library
 #[derive(Debug, Serialize, Clone)]
-#[serde(tag = "type")] // give each JSON record a "type" field indicating the enum type, easier to consume from JS
 enum VteEvent {
     Print(char),
     Execute {
@@ -769,6 +768,16 @@ fn set_bold() -> Result<()> {
 #[test]
 fn nu_prompt() -> Result<()> {
     let input = include_bytes!("snapshots/escape_artist__nu_prompt.input");
+
+    let events = parse_bytes(input.iter().copied());
+    insta::assert_yaml_snapshot!(events);
+
+    Ok(())
+}
+
+#[test]
+fn bash_starship_prompt() -> Result<()> {
+    let input = include_bytes!("snapshots/bash_starship_prompt.input");
 
     let events = parse_bytes(input.iter().copied());
     insta::assert_yaml_snapshot!(events);

@@ -1,16 +1,16 @@
 ---
 source: src/main.rs
-expression: cloned
+expression: events
 ---
-- type: CsiDispatch
-  params:
-    - - 1
-  intermediates: []
-  ignore: false
-  c: m
-  raw_bytes:
-    - 27
-    - 91
-    - 49
-    - 109
+- CsiDispatch:
+    params:
+      - - 1
+    intermediates: []
+    ignore: false
+    c: m
+    raw_bytes:
+      - 27
+      - 91
+      - 49
+      - 109
 

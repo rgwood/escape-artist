@@ -3,7 +3,10 @@ use std::{
     io::{stdout, Write},
     net::SocketAddr,
     path::PathBuf,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     thread,
     time::Duration,
 };
@@ -51,6 +54,15 @@ struct Cli {
 
 fn main() -> Result<()> {
     initialize_environment();
+
+    let resize_signaled = Arc::new(AtomicBool::new(false));
+    let resize_clone = resize_signaled.clone();
+    thread::spawn(move || loop {
+        if let crossterm::event::Event::Resize(_, _) = crossterm::event::read().unwrap() {
+            resize_clone.store(true, Ordering::Relaxed)
+        }
+    });
+
     let cli = Cli::parse();
     let shell_path = match cli.shell {
         Some(s) => s,
@@ -81,7 +93,6 @@ fn main() -> Result<()> {
 
     let (cols, rows) = terminal::size()?;
     let pair = pty_system.openpty(PtySize {
-        // TODO: handle SIGWINCH
         rows,
         cols,
         pixel_width: 0,
@@ -163,12 +174,26 @@ fn main() -> Result<()> {
             );
     });
 
+    // let mc = pair.master.
+
     let mut child_stdin = pair.master.take_writer()?;
     // forward all input from this process to the child
     loop {
+        if resize_signaled.load(Ordering::Relaxed) {
+            let (cols, rows) = terminal::size()?;
+            pair.master
+                .resize(PtySize {
+                    rows,
+                    cols,
+                    pixel_width: 0,
+                    pixel_height: 0,
+                })
+                .unwrap();
+            resize_signaled.store(false, Ordering::Relaxed);
+        }
+
         let mut buffer = [0; 1024];
         let n = stdin.read(&mut buffer[..])?;
-
         let bytes = buffer[..n].to_vec();
         child_stdin.write_all(&bytes)?;
 
@@ -275,7 +300,10 @@ async fn stream_events(app_state: AppState, mut ws: WebSocket) {
             // optimization: if this is a string and the last item in the batch is also a string, concatenate them
             // this greatly cuts down on the number of events sent to the front-end
             if let VteEventDto::Print { string } = &e {
-                if let Some(VteEventDto::Print { string: last_string }) = batch.last_mut() {
+                if let Some(VteEventDto::Print {
+                    string: last_string,
+                }) = batch.last_mut()
+                {
                     last_string.push_str(string);
                     continue;
                 }
@@ -744,7 +772,6 @@ where
     }
 }
 
-
 // Some snapshot tests that are mostly useful for seeing what VTE is doing
 #[test]
 fn set_bold() -> Result<()> {
@@ -778,9 +805,8 @@ fn bash_starship_prompt() -> Result<()> {
     Ok(())
 }
 
-
 #[cfg(test)]
-fn parse_bytes(combined: impl Iterator<Item=u8>) -> Vec<VteEvent> {
+fn parse_bytes(combined: impl Iterator<Item = u8>) -> Vec<VteEvent> {
     // capacity arbitrarily chosen
     let (tx, _) = broadcast::channel::<VteEventDto>(10000);
     let state = AppState {

@@ -25,6 +25,7 @@ rust-embed = { version = "6.6.1", features = ["axum-ex"] }
 mime_guess = "2.0.4"
 open = "4.0.2"
 rand = "0.8.5"
+signal-hook = "0.3.15"
 
 [profile.release]
 lto = true      # Enable Link Time Optimization

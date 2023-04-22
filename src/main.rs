@@ -30,6 +30,7 @@ use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use rand::seq::SliceRandom;
 use rust_embed::RustEmbed;
 use serde::Serialize;
+use signal_hook::consts::SIGWINCH;
 use tokio::{
     sync::{broadcast, Mutex},
     time::{timeout_at, Instant},
@@ -54,14 +55,9 @@ struct Cli {
 
 fn main() -> Result<()> {
     initialize_environment();
-
     let resize_signaled = Arc::new(AtomicBool::new(false));
-    let resize_clone = resize_signaled.clone();
-    thread::spawn(move || loop {
-        if let crossterm::event::Event::Resize(_, _) = crossterm::event::read().unwrap() {
-            resize_clone.store(true, Ordering::Relaxed)
-        }
-    });
+    // No SIGWINCH on Windows, but it seems like there's no great alternative: https://github.com/microsoft/terminal/issues/281
+    let _ = signal_hook::flag::register(SIGWINCH, resize_signaled.clone());
 
     let cli = Cli::parse();
     let shell_path = match cli.shell {

@@ -196,7 +196,7 @@ fn _print_all_events(vte_rx: &Vec<VteEvent>) {
     let mut last_was_char = true;
     for event in vte_rx {
         match event {
-            VteEvent::Print { c } => {
+            VteEvent::Print(c) => {
                 print!("{c}");
                 last_was_char = true;
             }
@@ -330,7 +330,7 @@ impl Performer {
 
 impl Perform for Performer {
     fn print(&mut self, c: char) {
-        self.log(VteEvent::Print { c });
+        self.log(VteEvent::Print(c));
     }
 
     fn execute(&mut self, byte: u8) {
@@ -394,9 +394,7 @@ impl Perform for Performer {
 #[derive(Debug, Serialize, Clone)]
 #[serde(tag = "type")] // give each JSON record a "type" field indicating the enum type, easier to consume from JS
 enum VteEvent {
-    Print {
-        c: char,
-    },
+    Print(char),
     Execute {
         byte: u8,
     },
@@ -453,7 +451,7 @@ enum VteEventDto {
 impl From<&VteEvent> for VteEventDto {
     fn from(value: &VteEvent) -> Self {
         match value {
-            VteEvent::Print { c } => VteEventDto::Print {
+            VteEvent::Print(c) => VteEventDto::Print {
                 string: String::from(*c),
             },
             VteEvent::Execute { byte } => match byte {

@@ -758,29 +758,37 @@ where
 // maybe use insta for snapshot tests
 #[test]
 fn set_bold() -> Result<()> {
-    let all_events: Arc<Mutex<Vec<VteEvent>>> = Arc::new(Mutex::new(vec![]));
-    let (tx, _) = broadcast::channel::<VteEventDto>(10000); // capacity arbitrarily chosen
-    let state = AppState { all_events, tx };
+    let esc = [b'\x1b'];
+    let input = "[1m";
+    let combined = esc.iter().chain(input.as_bytes()).map(|i| *i);
+
+    let events = parse_bytes(combined);
+
+    let cloned = events.clone(); // having trouble serializing things behind a mutex guard
+    insta::assert_yaml_snapshot!(cloned);
+
+    Ok(())
+}
+
+fn parse_bytes(combined: impl Iterator<Item = u8>) -> Vec<VteEvent> {
+    // capacity arbitrarily chosen
+    let (tx, _) = broadcast::channel::<VteEventDto>(10000);
+    let state = AppState {
+        all_events: Arc::new(Mutex::new(vec![])),
+        tx,
+    };
 
     let mut performer = Performer {
         curr_cmd_bytes: Vec::new(),
         state: state.clone(),
     };
 
-    let esc = [b'\x1b'];
-    let input = "[1ma";
-    let combined = esc.iter().chain(input.as_bytes());
-
     let mut statemachine = vte::Parser::new();
 
     for byte in combined {
-        performer.curr_cmd_bytes.push(*byte);
-        statemachine.advance(&mut performer, *byte);
+        performer.curr_cmd_bytes.push(byte);
+        statemachine.advance(&mut performer, byte);
     }
-
     let events = state.all_events.blocking_lock();
-    let cloned = events.clone(); // having trouble serializing things behind a mutex guard
-    insta::assert_yaml_snapshot!(cloned);
-
-    Ok(())
+    events.clone()
 }

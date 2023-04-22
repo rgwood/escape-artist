@@ -275,14 +275,9 @@ async fn stream_events(app_state: AppState, mut ws: WebSocket) {
             // optimization: if this is a string and the last item in the batch is also a string, concatenate them
             // this greatly cuts down on the number of events sent to the front-end
             if let VteEventDto::Print { string } = &e {
-                if let Some(last) = batch.last_mut() {
-                    if let VteEventDto::Print {
-                        string: last_string,
-                    } = last
-                    {
-                        last_string.push_str(string);
-                        continue;
-                    }
+                if let Some(VteEventDto::Print { string: last_string }) = batch.last_mut() {
+                    last_string.push_str(string);
+                    continue;
                 }
             }
 

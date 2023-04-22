@@ -360,10 +360,8 @@ expression: events
       - 91
       - 48
       - 109
-- Execute:
-    byte: 13
-- Execute:
-    byte: 10
+- Execute: 13
+- Execute: 10
 - CsiDispatch:
     params:
       - - 1

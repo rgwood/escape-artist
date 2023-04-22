@@ -334,7 +334,7 @@ impl Perform for Performer {
     }
 
     fn execute(&mut self, byte: u8) {
-        self.log(VteEvent::Execute { byte });
+        self.log(VteEvent::Execute(byte));
     }
 
     fn hook(&mut self, params: &Params, intermediates: &[u8], ignore: bool, c: char) {
@@ -394,9 +394,7 @@ impl Perform for Performer {
 #[derive(Debug, Serialize, Clone)]
 enum VteEvent {
     Print(char),
-    Execute {
-        byte: u8,
-    },
+    Execute(u8),
     Hook {
         params: Vec<Vec<u16>>,
         intermediates: Vec<u8>,
@@ -453,7 +451,7 @@ impl From<&VteEvent> for VteEventDto {
             VteEvent::Print(c) => VteEventDto::Print {
                 string: String::from(*c),
             },
-            VteEvent::Execute { byte } => match byte {
+            VteEvent::Execute(byte) => match byte {
                 10 => VteEventDto::LineBreak { title: "CR".into() },
                 13 => VteEventDto::LineBreak { title: "LF".into() },
                 _ => {

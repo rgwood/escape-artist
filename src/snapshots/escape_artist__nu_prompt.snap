@@ -24,10 +24,8 @@ expression: events
 - Print: " "
 - Print: " "
 - Print: ","
-- Execute:
-    byte: 13
-- Execute:
-    byte: 10
+- Execute: 13
+- Execute: 10
 - CsiDispatch:
     params:
       - - 32
@@ -104,10 +102,8 @@ expression: events
       - 48
       - 109
 - Print: ","
-- Execute:
-    byte: 13
-- Execute:
-    byte: 10
+- Execute: 13
+- Execute: 10
 - CsiDispatch:
     params:
       - - 32
@@ -190,10 +186,8 @@ expression: events
 - Print: g
 - Print: e
 - Print: ","
-- Execute:
-    byte: 13
-- Execute:
-    byte: 10
+- Execute: 13
+- Execute: 10
 - CsiDispatch:
     params:
       - - 32
@@ -257,14 +251,10 @@ expression: events
 - Print: e
 - Print: d
 - Print: "!"
-- Execute:
-    byte: 13
-- Execute:
-    byte: 10
-- Execute:
-    byte: 13
-- Execute:
-    byte: 10
+- Execute: 13
+- Execute: 10
+- Execute: 13
+- Execute: 10
 - Print: P
 - Print: l
 - Print: e
@@ -374,10 +364,8 @@ expression: events
       - 91
       - 48
       - 109
-- Execute:
-    byte: 13
-- Execute:
-    byte: 10
+- Execute: 13
+- Execute: 10
 - Print: O
 - Print: u
 - Print: r
@@ -492,10 +480,8 @@ expression: events
       - 91
       - 48
       - 109
-- Execute:
-    byte: 13
-- Execute:
-    byte: 10
+- Execute: 13
+- Execute: 10
 - Print: O
 - Print: u
 - Print: r
@@ -592,10 +578,8 @@ expression: events
       - 91
       - 48
       - 109
-- Execute:
-    byte: 13
-- Execute:
-    byte: 10
+- Execute: 13
+- Execute: 10
 - CsiDispatch:
     params:
       - - 36
@@ -666,10 +650,8 @@ expression: events
       - 91
       - 48
       - 109
-- Execute:
-    byte: 13
-- Execute:
-    byte: 10
+- Execute: 13
+- Execute: 10
 - Print: L
 - Print: e
 - Print: a
@@ -787,14 +769,10 @@ expression: events
       - 91
       - 48
       - 109
-- Execute:
-    byte: 13
-- Execute:
-    byte: 10
-- Execute:
-    byte: 13
-- Execute:
-    byte: 10
+- Execute: 13
+- Execute: 10
+- Execute: 13
+- Execute: 10
 - Print: I
 - Print: t
 - Print: "'"
@@ -867,10 +845,8 @@ expression: events
 - Print: i
 - Print: t
 - Print: ":"
-- Execute:
-    byte: 13
-- Execute:
-    byte: 10
+- Execute: 13
+- Execute: 10
 - Print: "3"
 - Print: y
 - Print: r
@@ -937,14 +913,10 @@ expression: events
       - 91
       - 48
       - 109
-- Execute:
-    byte: 13
-- Execute:
-    byte: 10
-- Execute:
-    byte: 13
-- Execute:
-    byte: 10
+- Execute: 13
+- Execute: 10
+- Execute: 13
+- Execute: 10
 - Print: S
 - Print: t
 - Print: a
@@ -974,10 +946,8 @@ expression: events
 - Print: "4"
 - Print: n
 - Print: s
-- Execute:
-    byte: 13
-- Execute:
-    byte: 10
+- Execute: 13
+- Execute: 10
 - CsiDispatch:
     params:
       - - 6

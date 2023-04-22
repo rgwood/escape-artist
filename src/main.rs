@@ -752,23 +752,33 @@ where
     }
 }
 
-// TODO: polish this until it's useful as interactive documentation for VTE
-// maybe use insta for snapshot tests
+
+// Some snapshot tests that are mostly useful for seeing what VTE is doing
 #[test]
 fn set_bold() -> Result<()> {
     let esc = [b'\x1b'];
     let input = "[1m";
-    let combined = esc.iter().chain(input.as_bytes()).map(|i| *i);
+    let combined = esc.iter().chain(input.as_bytes()).copied();
 
     let events = parse_bytes(combined);
-
-    let cloned = events.clone(); // having trouble serializing things behind a mutex guard
-    insta::assert_yaml_snapshot!(cloned);
+    insta::assert_yaml_snapshot!(events);
 
     Ok(())
 }
 
-fn parse_bytes(combined: impl Iterator<Item = u8>) -> Vec<VteEvent> {
+#[test]
+fn nu_prompt() -> Result<()> {
+    let input = include_bytes!("snapshots/escape_artist__nu_prompt.input");
+
+    let events = parse_bytes(input.iter().copied());
+    insta::assert_yaml_snapshot!(events);
+
+    Ok(())
+}
+
+
+#[cfg(test)]
+fn parse_bytes(combined: impl Iterator<Item=u8>) -> Vec<VteEvent> {
     // capacity arbitrarily chosen
     let (tx, _) = broadcast::channel::<VteEventDto>(10000);
     let state = AppState {

@@ -553,20 +553,120 @@ fn csi_front_end(
         .join(";");
     ascii.push(*c);
 
-    let mut tooltip = None;
+    let params_without_subparams: Vec<u16> =
+        params.iter().filter_map(|p| p.first().copied()).collect();
 
-    // Select Graphic Rendition https://stackoverflow.com/a/33206814/
-    if *c == 'm' {
-        tooltip = sgr(params);
-    } else if *c == 'n' {
-        // TODO: handle Query Cursor Position
-    }
+    let tooltip = match *c {
+        'h' => csi_h(params_without_subparams),
+        'J' => csi_J(params_without_subparams),
+        'K' => csi_K(params_without_subparams),
+        'l' => csi_l(params_without_subparams),
+        'm' => sgr(params),
+        'n' => csi_n(params_without_subparams),
+        _ => None,
+    };
 
     VteEventDto::GenericEscape {
         title: format!("CSI {ascii}"),
         tooltip,
         raw_bytes: sanitize_raw_bytes(raw_bytes),
     }
+}
+
+fn csi_h(params: Vec<u16>) -> Option<String> {
+    let mut actions: Vec<String> = Vec::new();
+    if params.contains(&25) {
+        actions.push("Make cursor visible".into());
+    }
+    if params.contains(&47) {
+        actions.push("Save screen".into());
+    }
+    if params.contains(&1049) {
+        actions.push("Enable the alternative buffer".into());
+    }
+
+    if actions.is_empty() {
+        return None;
+    }
+
+    Some(actions.join(". "))
+}
+
+fn csi_l(params: Vec<u16>) -> Option<String> {
+    let mut actions: Vec<String> = Vec::new();
+    if params.contains(&25) {
+        actions.push("Make cursor invisible".into());
+    }
+    if params.contains(&47) {
+        actions.push("Restore screen".into());
+    }
+    if params.contains(&1049) {
+        actions.push("Disable the alternative buffer".into());
+    }
+
+    if actions.is_empty() {
+        return None;
+    }
+
+    Some(actions.join(". "))
+}
+
+fn csi_n(params: Vec<u16>) -> Option<String> {
+    let mut actions: Vec<String> = Vec::new();
+    if params.contains(&6) {
+        actions.push("Query cursor position".into());
+    }
+
+    if actions.is_empty() {
+        return None;
+    }
+
+    Some(actions.join(". "))
+}
+
+#[allow(non_snake_case)]
+fn csi_J(params: Vec<u16>) -> Option<String> {
+    let mut actions: Vec<String> = Vec::new();
+
+    if params.is_empty() || params.contains(&0) {
+        actions.push("Clear from cursor to end of screen".into());
+    }
+    if params.contains(&1) {
+        actions.push("Clear from cursor to start of screen".into());
+    }
+    if params.contains(&2) {
+        actions.push("Clear entire screen".into());
+    }
+    if params.contains(&3) {
+        actions.push("Clear saved lines".into());
+    }
+
+    if actions.is_empty() {
+        return None;
+    }
+
+    Some(actions.join(". "))
+}
+
+#[allow(non_snake_case)]
+fn csi_K(params: Vec<u16>) -> Option<String> {
+    let mut actions: Vec<String> = Vec::new();
+
+    if params.is_empty() || params.contains(&0) {
+        actions.push("Clear from cursor to end of line".into());
+    }
+    if params.contains(&1) {
+        actions.push("Clear from start of line to cursor".into());
+    }
+    if params.contains(&2) {
+        actions.push("Clear entire line".into());
+    }
+
+    if actions.is_empty() {
+        return None;
+    }
+
+    Some(actions.join(". "))
 }
 
 // Select Graphic Rendition https://stackoverflow.com/a/33206814/

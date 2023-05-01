@@ -558,6 +558,7 @@ fn csi_front_end(
 
     let tooltip = match *c {
         'h' => csi_h(params_without_subparams),
+        'H' => csi_H(params_without_subparams),
         'J' => csi_J(params_without_subparams),
         'K' => csi_K(params_without_subparams),
         'l' => csi_l(params_without_subparams),
@@ -583,6 +584,24 @@ fn csi_h(params: Vec<u16>) -> Option<String> {
     }
     if params.contains(&1049) {
         actions.push("Enable the alternative buffer".into());
+    }
+
+    if actions.is_empty() {
+        return None;
+    }
+
+    Some(actions.join(". "))
+}
+
+#[allow(non_snake_case)]
+fn csi_H(params: Vec<u16>) -> Option<String> {
+    let mut actions: Vec<String> = Vec::new();
+
+    match params.as_slice() {
+        [] => actions.push("Move cursor to top left corner (1,1)".into()),
+        // TODO: handle single param, not sure what that means
+        [row, column] => actions.push(format!("Move cursor to ({}, {})", row, column)),
+        _ => {},
     }
 
     if actions.is_empty() {

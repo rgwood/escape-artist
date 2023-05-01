@@ -542,12 +542,16 @@ fn other_escape_front_end(byte: &u8, raw_bytes: &Vec<u8>) -> VteEventDto {
 
 fn csi_front_end(
     params: &[Vec<u16>],
-    _intermediates: &[u8],
+    intermediates: &[u8],
     _ignore: &bool,
     c: &char,
     raw_bytes: &Vec<u8>,
 ) -> VteEventDto {
-    let mut ascii = params
+    let mut ascii = intermediates
+        .iter()
+        .map(|i| char::from(*i))
+        .collect::<String>();
+    ascii += &params
         .iter()
         .map(|p| p.iter().map(|s| s.to_string()).join(","))
         .join(";");
@@ -601,7 +605,7 @@ fn csi_H(params: Vec<u16>) -> Option<String> {
         [] => actions.push("Move cursor to top left corner (1,1)".into()),
         // TODO: handle single param, not sure what that means
         [row, column] => actions.push(format!("Move cursor to ({}, {})", row, column)),
-        _ => {},
+        _ => {}
     }
 
     if actions.is_empty() {

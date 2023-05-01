@@ -558,7 +558,6 @@ fn csi_front_end(
     let params_without_subparams: Vec<u16> =
         params.iter().filter_map(|p| p.first().copied()).collect();
 
-    // TODO: handle intermediates too, like the `?` in `CSI ?1h` to set application mode https://vt100.net/docs/vt510-rm/DECCKM.html
     let tooltip = match *c {
         'A' => move_cursor('A', params_without_subparams),
         'B' => move_cursor('B', params_without_subparams),
@@ -633,8 +632,9 @@ fn csi_H(params: Vec<u16>) -> Option<String> {
     let mut actions: Vec<String> = Vec::new();
 
     match params.as_slice() {
-        [] => actions.push("Move cursor to top left corner (1,1)".into()),
-        // TODO: handle single param, not sure what that means
+        [] => actions.push("Move cursor to top left corner (0,0)".into()),
+        // I believe a single param is just the row, but I'm not sure
+        [row] => actions.push(format!("Move cursor to ({row},0)")),
         [row, column] => actions.push(format!("Move cursor to ({}, {})", row, column)),
         _ => {}
     }

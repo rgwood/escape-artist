@@ -547,10 +547,8 @@ fn csi_front_end(
     c: &char,
     raw_bytes: &Vec<u8>,
 ) -> VteEventDto {
-    let mut ascii = intermediates
-        .iter()
-        .map(|i| char::from(*i))
-        .collect::<String>();
+    let intermediates = intermediates.iter().map(|i| char::from(*i)).collect_vec();
+    let mut ascii = intermediates.iter().collect::<String>();
     ascii += &params
         .iter()
         .map(|p| p.iter().map(|s| s.to_string()).join(","))
@@ -560,12 +558,19 @@ fn csi_front_end(
     let params_without_subparams: Vec<u16> =
         params.iter().filter_map(|p| p.first().copied()).collect();
 
+    // TODO: handle intermediates too, like the `?` in `CSI ?1h` to set application mode https://vt100.net/docs/vt510-rm/DECCKM.html
     let tooltip = match *c {
-        'h' => csi_h(params_without_subparams),
+        'A' => move_cursor('A', params_without_subparams),
+        'B' => move_cursor('B', params_without_subparams),
+        'C' => move_cursor('C', params_without_subparams),
+        'D' => move_cursor('D', params_without_subparams),
+        'E' => move_cursor('E', params_without_subparams),
+        'F' => move_cursor('F', params_without_subparams),
+        'h' => csi_h(params_without_subparams, intermediates),
         'H' => csi_H(params_without_subparams),
         'J' => csi_J(params_without_subparams),
         'K' => csi_K(params_without_subparams),
-        'l' => csi_l(params_without_subparams),
+        'l' => csi_l(params_without_subparams, intermediates),
         'm' => sgr(params),
         'n' => csi_n(params_without_subparams),
         _ => None,
@@ -578,16 +583,42 @@ fn csi_front_end(
     }
 }
 
-fn csi_h(params: Vec<u16>) -> Option<String> {
+fn move_cursor(c: char, params: Vec<u16>) -> Option<String> {
+    if let [n] = params.as_slice() {
+        return match c {
+            'A' => Some(format!("Move cursor {n} rows up")),
+            'B' => Some(format!("Move cursor {n} rows down")),
+            'C' => Some(format!("Move cursor {n} columns right")),
+            'D' => Some(format!("Move cursor {n} columns left")),
+            'E' => Some(format!("Move cursor {n} rows down, to column 1")),
+            'F' => Some(format!("Move cursor {n} rows up, to column 1")),
+            _ => None,
+        };
+    }
+
+    None
+}
+
+fn csi_h(params: Vec<u16>, intermediates: Vec<char>) -> Option<String> {
     let mut actions: Vec<String> = Vec::new();
-    if params.contains(&25) {
-        actions.push("Make cursor visible".into());
-    }
-    if params.contains(&47) {
-        actions.push("Save screen".into());
-    }
-    if params.contains(&1049) {
-        actions.push("Enable the alternative buffer".into());
+
+    // private use sequences https://unix.stackexchange.com/a/289055/
+    if intermediates.contains(&'?') {
+        if params.contains(&1) {
+            actions.push("Application Cursor Keys".into());
+        }
+        if params.contains(&25) {
+            actions.push("Show cursor".into());
+        }
+        if params.contains(&47) {
+            actions.push("Save screen".into());
+        }
+        if params.contains(&1049) {
+            actions.push("Enable the alternative buffer".into());
+        }
+        if params.contains(&2004) {
+            actions.push("Enable bracketed paste mode".into());
+        }
     }
 
     if actions.is_empty() {
@@ -615,16 +646,27 @@ fn csi_H(params: Vec<u16>) -> Option<String> {
     Some(actions.join(". "))
 }
 
-fn csi_l(params: Vec<u16>) -> Option<String> {
+fn csi_l(params: Vec<u16>, intermediates: Vec<char>) -> Option<String> {
     let mut actions: Vec<String> = Vec::new();
-    if params.contains(&25) {
-        actions.push("Make cursor invisible".into());
-    }
-    if params.contains(&47) {
-        actions.push("Restore screen".into());
-    }
-    if params.contains(&1049) {
-        actions.push("Disable the alternative buffer".into());
+    if intermediates.contains(&'?') {
+        if params.contains(&1) {
+            actions.push("Reset Cursor Keys".into());
+        }
+        if params.contains(&12) {
+            actions.push("Stop blinking cursor".into());
+        }
+        if params.contains(&25) {
+            actions.push("Hide cursor".into());
+        }
+        if params.contains(&47) {
+            actions.push("Restore screen".into());
+        }
+        if params.contains(&1049) {
+            actions.push("Disable the alternative buffer".into());
+        }
+        if params.contains(&2004) {
+            actions.push("Disable bracketed paste mode".into());
+        }
     }
 
     if actions.is_empty() {
@@ -697,6 +739,7 @@ fn sgr(params: &[Vec<u16>]) -> Option<String> {
     let mut foreground_colors: Vec<String> = vec![];
     let mut background_colors: Vec<String> = vec![];
     let mut attributes: Vec<String> = vec![];
+    let mut reset_attributes: Vec<String> = vec![];
 
     // this iterator returns items of Vec<u16>
     // the first item in the vec is the parameter, later items are subparameters
@@ -720,6 +763,13 @@ fn sgr(params: &[Vec<u16>]) -> Option<String> {
             7 => attributes.push("reverse".into()),
             8 => attributes.push("hidden".into()),
             9 => attributes.push("strikethrough".into()),
+            22 => reset_attributes.push("bold/dim".into()),
+            23 => reset_attributes.push("italic".into()),
+            24 => reset_attributes.push("underline".into()),
+            25 => reset_attributes.push("blink".into()),
+            27 => reset_attributes.push("reverse".into()),
+            28 => reset_attributes.push("hidden".into()),
+            29 => reset_attributes.push("strikethrough".into()),
             30 => foreground_colors.push("black".into()),
             31 => foreground_colors.push("red".into()),
             32 => foreground_colors.push("green".into()),
@@ -807,9 +857,13 @@ fn sgr(params: &[Vec<u16>]) -> Option<String> {
     let mut tooltip = String::new();
 
     if !attributes.is_empty() {
+        tooltip.push_str(&format!("Set text to {}. ", attributes.join(", ")));
+    }
+
+    if !reset_attributes.is_empty() {
         tooltip.push_str(&format!(
-            "Set text attributes to {}. ",
-            attributes.join(", ")
+            "Reset {} text attributes. ",
+            reset_attributes.join("/")
         ));
     }
 
@@ -850,14 +904,33 @@ fn osc_front_end(
 
         return VteEventDto::GenericEscape {
             title: format!("OSC {ascii}"),
-            tooltip: Some(format!("Set title to '{param}'")),
+            tooltip: Some(format!("Set icon name and window title to '{param}'")),
             raw_bytes: sanitize_raw_bytes(raw_bytes),
         };
     }
 
-    let more = if params.len() > 1 { "..." } else { "" };
+    if ascii == "1" && params.len() > 1 {
+        let param = String::from_utf8_lossy(&params[1]);
+
+        return VteEventDto::GenericEscape {
+            title: format!("OSC {ascii}"),
+            tooltip: Some(format!("Set icon name to '{param}'")),
+            raw_bytes: sanitize_raw_bytes(raw_bytes),
+        };
+    }
+
+    if ascii == "2" && params.len() > 1 {
+        let param = String::from_utf8_lossy(&params[1]);
+
+        return VteEventDto::GenericEscape {
+            title: format!("OSC {ascii}"),
+            tooltip: Some(format!("Set window title to '{param}'")),
+            raw_bytes: sanitize_raw_bytes(raw_bytes),
+        };
+    }
+
     VteEventDto::GenericEscape {
-        title: format!("OSC {ascii}{more}"),
+        title: format!("OSC {ascii}"),
         tooltip: None,
         raw_bytes: sanitize_raw_bytes(raw_bytes),
     }

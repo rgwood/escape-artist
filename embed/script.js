@@ -19,12 +19,12 @@ let events = [];
 
 function Event(props) {
   let dto = props.dto;
-  const shared_classes = "w-fit border rounded-sm px-1 m-1 bg-slate-800"
+  const shared_classes = "w-fit outline outline-1 rounded-sm px-1 m-1 bg-slate-800"
   switch (dto.type) {
     case "Print":
       return html`<span>${dto.string}</span>`;
     case "GenericEscape": {
-      let border = !!dto.tooltip ? "border-blue-400" : "border-slate-400";
+      let border = !!dto.tooltip ? "outline-blue-400" : "outline-slate-400";
 
       let showTooltip = (event) => {
         const tooltip = document.querySelector('#tooltip');
@@ -44,17 +44,17 @@ function Event(props) {
     }
     case "LineBreak": {
       return html`
-      <div class="${shared_classes} border-slate-500 text-xs">
+      <div class="${shared_classes} outline-slate-500 text-xs">
         ${dto.title}
       </div>`;
     }
     case "Disconnected": {
-      return html`<div class="${shared_classes} border-red-500">
+      return html`<div class="${shared_classes} outline-red-500">
         Disconnected
       </div>`;
     }
     default:
-      return html`<span class="inline-block ${shared_classes} border-slate-500">${dto.type}</span>`;
+      return html`<span class="inline-block ${shared_classes} outline-slate-500">${dto.type}</span>`;
   }
 }
 
@@ -83,7 +83,7 @@ function renderAndScroll() {
       </div>
       <div id="arrow" class="absolute bg-slate-800 w-2 h-2 rotate-45"></div>
     </div>
-    <a href="/help.html" class="bg-slate-800 hover:bg-cyan-900 p-0 font-bold rounded-sm border border-slate-400 m-2 w-8 text-center fixed top-0 right-0">❔</a>
+    <a href="/help.html" class="bg-slate-800 hover:bg-cyan-900 p-0 font-bold rounded-sm outline outline-1 outline-slate-400 m-2 w-8 text-center fixed top-0 right-0">❔</a>
     ${events.map((event) => html`<${Event} dto="${event}" />`)}
     `,
     document.body

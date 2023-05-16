@@ -895,42 +895,64 @@ fn osc_front_end(
 ) -> VteEventDto {
     // TODO handle things like OSC 133;B. Show more than first param
     // ]133;B
-    let first = params.first().unwrap();
-    let ascii = String::from_utf8_lossy(first);
+
+    if params.is_empty() {
+        return VteEventDto::GenericEscape {
+            title: "OSC".into(),
+            tooltip: None,
+            raw_bytes: sanitize_raw_bytes(raw_bytes),
+        };
+    }
+
+    let params = params
+        .iter()
+        .map(|p| String::from_utf8_lossy(p).to_string())
+        .collect::<Vec<String>>();
+    let first = &params[0];
 
     // set title https://tldp.org/HOWTO/Xterm-Title-3.html
-    if ascii == "0" && params.len() > 1 {
-        let param = String::from_utf8_lossy(&params[1]);
-
+    if first == "0" && params.len() > 1 {
         return VteEventDto::GenericEscape {
-            title: format!("OSC {ascii}"),
-            tooltip: Some(format!("Set icon name and window title to '{param}'")),
+            title: format!("OSC {first}"),
+            tooltip: Some(format!("Set icon name and window title to '{}'", params[1])),
             raw_bytes: sanitize_raw_bytes(raw_bytes),
         };
     }
 
-    if ascii == "1" && params.len() > 1 {
-        let param = String::from_utf8_lossy(&params[1]);
-
+    if first == "1" && params.len() > 1 {
         return VteEventDto::GenericEscape {
-            title: format!("OSC {ascii}"),
-            tooltip: Some(format!("Set icon name to '{param}'")),
+            title: format!("OSC {first}"),
+            tooltip: Some(format!("Set icon name to '{}'", params[1])),
             raw_bytes: sanitize_raw_bytes(raw_bytes),
         };
     }
 
-    if ascii == "2" && params.len() > 1 {
-        let param = String::from_utf8_lossy(&params[1]);
+    if first == "2" && params.len() > 1 {
+        return VteEventDto::GenericEscape {
+            title: format!("OSC {first}"),
+            tooltip: Some(format!("Set window title to '{}'", params[1])),
+            raw_bytes: sanitize_raw_bytes(raw_bytes),
+        };
+    }
+
+    if first == "133" && params.len() > 1 {
+        let (title, tooltip) = match params[1].as_str() {
+            "A" => ("Pre-prompt", Some("OSC 133 pre-prompt marker")),
+            "B" => ("Post-prompt", Some("OSC 133 post-prompt marker")),
+            "C" => ("Pre-input", Some("OSC 133 pre-input marker")),
+            "D" => ("Post-input", Some("OSC 133 post-input marker")),
+            _ => ("OSC 133", None),
+        };
 
         return VteEventDto::GenericEscape {
-            title: format!("OSC {ascii}"),
-            tooltip: Some(format!("Set window title to '{param}'")),
+            title: title.into(),
+            tooltip: tooltip.map(|s| s.into()),
             raw_bytes: sanitize_raw_bytes(raw_bytes),
         };
     }
 
     VteEventDto::GenericEscape {
-        title: format!("OSC {ascii}"),
+        title: format!("OSC {first}"),
         tooltip: None,
         raw_bytes: sanitize_raw_bytes(raw_bytes),
     }

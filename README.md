@@ -12,7 +12,7 @@ After that, you can launch Escape Artist by running `escape-artist` in your term
 
 ## Project Status
 
-This was hacked together for the [Handmade Network Visibility Jam](https://handmade.network/jam), so it might be a little rough around the edges. It's primarily been developed on Linux, but I used cross-platform libraries and it *should* work on Windows+macOS too.
+This was hacked together for the [Handmade Network Visibility Jam](https://handmade.network/jam/visibility-2023), so it might be a little rough around the edges. It's primarily been developed on Linux, but I used cross-platform libraries and it *should* work on Windows+macOS too.
 
 ## FAQ
 

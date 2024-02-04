@@ -118,6 +118,7 @@ fn main() -> Result<()> {
         command.cwd(cwd);
     }
 
+    // Spawn the child process (shell usually), wired up to the PTY
     let child = pair.slave.spawn_command(command)?;
     // This reads output (stderr and stdout multiplexed into 1 stream) from child
     let mut reader = pair.master.try_clone_reader()?;
@@ -176,8 +177,6 @@ fn main() -> Result<()> {
                 "Failed to bind to socket. Maybe another service is already using the same port",
             );
     });
-
-    // let mc = pair.master.
 
     let mut child_stdin = pair.master.take_writer()?;
     // forward all input from this process to the child
@@ -749,7 +748,7 @@ fn sgr(params: &[Vec<u16>]) -> Option<String> {
 
     loop {
         //
-        let Some (param) = iter.next() else {
+        let Some(param) = iter.next() else {
             break;
         };
 

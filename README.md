@@ -6,13 +6,13 @@ Escape Artist is a tool for seeing ANSI escape codes in terminal applications. Y
 
 ## Installation
 
-Right now, the easiest way to install is Rust's Cargo package manager. [Install Rust](https://rustup.rs/), then run `cargo install escape-artist`
+Binaries for major OSs+architectures are attached to the GitHub releases, download+expand one and put it in your PATH. Alternately, you can build+install with Rust's Cargo package manager. [Install Rust](https://rustup.rs/), then run `cargo install escape-artist`
 
 After that, you can launch Escape Artist by running `escape-artist` in your terminal.
 
 ## Project Status
 
-This was hacked together for the [Handmade Network Visibility Jam](https://handmade.network/jam/visibility-2023), so it might be a little rough around the edges. It's primarily been developed on Linux, but I used cross-platform libraries and it *should* work on Windows+macOS too.
+This was hacked together for the [Handmade Network Visibility Jam](https://handmade.network/jam/visibility-2023), so it might be a little rough around the edges. It's primarily been developed on Linux, but I used cross-platform libraries and my limited testing on Windows+macOS has gone well.
 
 ## FAQ
 

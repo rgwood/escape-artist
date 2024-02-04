@@ -13,7 +13,7 @@ use std::{
 
 use anyhow::{bail, Result};
 use axum::{
-    body::{boxed, BoxBody, Full},
+    body::Body,
     extract::{
         ws::{Message, WebSocket},
         State, WebSocketUpgrade,
@@ -31,6 +31,7 @@ use rand::seq::SliceRandom;
 use rust_embed::RustEmbed;
 use serde::Serialize;
 use tokio::{
+    net::TcpListener,
     sync::{broadcast, Mutex},
     time::{timeout_at, Instant},
 };
@@ -170,12 +171,20 @@ fn main() -> Result<()> {
         let _ = open::that(url);
 
         let addr = SocketAddr::from(([127, 0, 0, 1], cli.port));
-        axum::Server::bind(&addr)
-            .serve(app.into_make_service())
+
+        let listener = TcpListener::bind(addr).await.expect(
+            "Failed to bind to socket. Maybe another service is already using the same port",
+        );
+        axum::serve(listener, app)
             .await
-            .expect(
-                "Failed to bind to socket. Maybe another service is already using the same port",
-            );
+            .expect("Failed to start HTTP server.");
+
+        // axum::Server::bind(&addr)
+        //     .serve(app.into_make_service())
+        //     .await
+        //     .expect(
+        //         "Failed to bind to socket. Maybe another service is already using the same port",
+        //     );
     });
 
     let mut child_stdin = pair.master.take_writer()?;
@@ -972,12 +981,12 @@ impl<T> IntoResponse for StaticFile<T>
 where
     T: Into<String>,
 {
-    fn into_response(self) -> Response<BoxBody> {
+    fn into_response(self) -> Response<Body> {
         let path = self.0.into();
 
         match Asset::get(path.as_str()) {
             Some(content) => {
-                let body = boxed(Full::from(content.data));
+                let body = Body::from(content.data);
                 let mime = mime_guess::from_path(path).first_or_octet_stream();
                 Response::builder()
                     .header(header::CONTENT_TYPE, mime.as_ref())
@@ -986,7 +995,7 @@ where
             }
             None => Response::builder()
                 .status(StatusCode::NOT_FOUND)
-                .body(boxed(Full::from("404")))
+                .body(Body::from("404"))
                 .unwrap(),
         }
     }

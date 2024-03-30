@@ -407,8 +407,6 @@ enum VteEventDto {
 impl From<&(Action, Vec<u8>)> for VteEventDto {
     fn from(value: &(Action, Vec<u8>)) -> Self {
         let (action, raw_bytes) = value;
-        let raw_bytes = sanitize_raw_bytes(raw_bytes);
-
         match action {
             Action::Print(c) => VteEventDto::Print {
                 string: c.to_string(),
@@ -420,44 +418,51 @@ impl From<&(Action, Vec<u8>)> for VteEventDto {
                 color: None,
                 bg_color: None,
             },
-            Action::Control(ctrl) => {
-                if matches!(ctrl, ControlCode::CarriageReturn) {
-                    return VteEventDto::LineBreak { title: "CR".into() };
-                }
-                if matches!(ctrl, ControlCode::LineFeed) {
-                    return VteEventDto::LineBreak { title: "LF".into() };
-                }
-                let description = format!("{ctrl:?}");
-                VteEventDto::GenericEscape {
-                    title: Some(description),
-                    icon_svg: None,
-                    tooltip: None,
-                    raw_bytes,
-                }
-            }
+            Action::Control(ctrl) => ctrl_to_dto(ctrl),
             Action::DeviceControl(dcm) => VteEventDto::GenericEscape {
                 title: Some(format!("DCM {dcm:?}")),
                 icon_svg: None,
                 tooltip: None,
-                raw_bytes,
+                raw_bytes: sanitize_raw_bytes(raw_bytes),
             },
             Action::OperatingSystemCommand(osc) => VteEventDto::GenericEscape {
                 title: Some(format!("OSC {osc:?}")),
                 icon_svg: None,
                 tooltip: None,
-                raw_bytes,
+                raw_bytes: sanitize_raw_bytes(raw_bytes),
             },
-            Action::CSI(csi) => csi_to_dto(csi, raw_bytes),
+            Action::CSI(csi) => csi_to_dto(csi, sanitize_raw_bytes(raw_bytes)),
             Action::Esc(e) => VteEventDto::GenericEscape {
                 title: Some(format!("ESC {e:?}")),
                 icon_svg: None,
                 tooltip: None,
-                raw_bytes,
+                raw_bytes: sanitize_raw_bytes(raw_bytes),
             },
             Action::Sixel(_) => todo!("sixel not implemented yet"),
             Action::XtGetTcap(_) => todo!("xt get tcap not implemented yet"),
             Action::KittyImage(_) => todo!("kitty image not implemented yet"),
         }
+    }
+}
+
+fn ctrl_to_dto(ctrl: &ControlCode) -> VteEventDto {
+    if matches!(ctrl, ControlCode::CarriageReturn) {
+        return VteEventDto::LineBreak { title: "CR".into() };
+    }
+    if matches!(ctrl, ControlCode::LineFeed) {
+        return VteEventDto::LineBreak { title: "LF".into() };
+    }
+
+    let as_byte = *ctrl as u8;
+
+    // let (title, tooltip, icon_svg) = match csi {
+
+    let title = format!("{ctrl:?}");
+    VteEventDto::GenericEscape {
+        title: Some(title),
+        icon_svg: None,
+        tooltip: None,
+        raw_bytes: format!("{:#02x}", as_byte),
     }
 }
 
@@ -469,9 +474,33 @@ fn csi_to_dto(csi: &CSI, raw_bytes: String) -> VteEventDto {
                 Some("SGR (Select Graphic Rendition) Reset".into()),
                 Some(iconify::svg!("carbon:reset").into()),
             ),
-            _ => (Some("SGR".into()), None, None),
+            Sgr::Foreground(color) => (
+                Some("FG".into()),
+                Some(format!("Set foreground color to: {color:?}")),
+                None,
+            ),
+            Sgr::Background(color) => (
+                Some("BG".into()),
+                Some(format!("Set background color to: {color:?}")),
+                None,
+            ),
+
+            _ => (Some("SGR".into()), Some(format!("Set {sgr:?}")), None),
         },
-        _ => (Some("CSI".into()), None, None),
+        CSI::Cursor(cursor) => (
+            None,
+            Some(format!("Move cursor: {cursor:?}")),
+            Some(iconify::svg!("ph:cursor-text-fill").into()),
+        ),
+        // CSI::Edit(_) => todo!(),
+        // CSI::Mode(_) => todo!(),
+        // CSI::Device(_) => todo!(),
+        // CSI::Mouse(_) => todo!(),
+        // CSI::Window(_) => todo!(),
+        // CSI::Keyboard(_) => todo!(),
+        // CSI::SelectCharacterPath(_, _) => todo!(),
+        // CSI::Unspecified(_) => todo!(),
+        _ => (Some("CSI".into()), Some(format!("{csi:?}")), None),
     };
 
     VteEventDto::GenericEscape {

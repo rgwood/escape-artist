@@ -13,28 +13,25 @@ license = "MIT"
 anyhow = "1.0.70"
 crossterm = "0.27.0"
 portable-pty = "0.8.1"
-vte = "0.13.0"
 
 axum = { version = "0.7.4", features = ["macros", "ws"] }
 serde = { version = "1.0.159", features = ["derive", "rc"] }
 serde_json = "1.0.95"
 tokio = { version = "1.27.0", features = ["full"] }
 clap = { version = "4.2.1", features = ["derive"] }
-itertools = "0.12.1"
 rust-embed = { version = "8.2.0", features = ["axum-ex"] }
 mime_guess = "2.0.4"
 open = "5.0.1"
 rand = "0.8.5"
 signal-hook = "0.3.15"
+termwiz = "0.22.0"
+ansi_colours = "1.2.2"
+iconify = "0.2.6"
 
 [profile.release]
 lto = true      # Enable Link Time Optimization
 opt-level = 'z' # Optimize for size.
 panic = 'abort' # Abort on panic
-
-[dev-dependencies]
-insta = { version = "1.29.0", features = ["yaml"] }
-serde_yaml = "0.9"
 
 
 # codegen-units = 1 # Set low to increase optimizations. Kills compile time though

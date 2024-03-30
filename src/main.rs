@@ -178,13 +178,6 @@ fn main() -> Result<()> {
         axum::serve(listener, app)
             .await
             .expect("Failed to start HTTP server.");
-
-        // axum::Server::bind(&addr)
-        //     .serve(app.into_make_service())
-        //     .await
-        //     .expect(
-        //         "Failed to bind to socket. Maybe another service is already using the same port",
-        //     );
     });
 
     let mut child_stdin = pair.master.take_writer()?;

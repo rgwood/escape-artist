@@ -17,6 +17,12 @@ url.protocol = url.protocol.replace("http", "ws");
 
 let events = [];
 
+function showTooltip(event) {
+  const tooltip = document.querySelector('#tooltip');
+  tooltip.style.display = 'block';
+  update(event.target);
+}
+
 function Event(props) {
   let dto = props.dto;
   const shared_classes = "w-fit outline outline-1 rounded-sm px-1 m-1 bg-slate-800"
@@ -33,16 +39,8 @@ function Event(props) {
       }
     case "GenericEscape": {
       let border = !!dto.tooltip ? "outline-blue-400" : "outline-slate-400";
-
-      let showTooltip = (event) => {
-        const tooltip = document.querySelector('#tooltip');
-        tooltip.style.display = 'block';
-        update(event.target);
-      }
-
       let svg = dto.icon_svg ? html`<span class="inline-block align-middle" dangerouslySetInnerHTML=${{ __html: dto.icon_svg}}/>` : html``;
       let title = dto.title ? html`<span>${dto.title}</span>` : ``;
-
       return html`<div
         data-tooltip=${dto.tooltip}
         data-rawbytes=${dto.raw_bytes}

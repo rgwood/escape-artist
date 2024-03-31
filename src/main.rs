@@ -32,7 +32,7 @@ use rust_embed::RustEmbed;
 use serde::Serialize;
 use termwiz::{
     color::ColorSpec,
-    escape::{csi::Sgr, parser::Parser, Action, ControlCode, CSI},
+    escape::{csi::Sgr, parser::Parser, Action, ControlCode, Esc, EscCode, CSI},
 };
 use tokio::{
     net::TcpListener,
@@ -174,8 +174,26 @@ fn main() -> Result<()> {
         let mut bg_color = ColorSpec::Default;
 
         while let Some((action, raw_bytes)) = action_receiver.recv().await {
-            update_global_colors(&action, &mut fg_color, &mut bg_color);
+            // optimization: if the last DTO was a print and this action is a print, concatenate them
+            // this greatly cuts down on the number of events sent to the front-end
 
+            if let Some(VteEventDto::Print {
+                string: last_string,
+                ..
+            }) = cloned_state.all_dtos.lock().await.last_mut()
+            {
+                if let Action::Print(c) = &action {
+                    last_string.push(*c);
+                    let tuple = (action, raw_bytes);
+                    let dto = VteEventDto::from(&tuple);
+                    let _ = cloned_state.tx.send(dto);
+                    continue;
+                }
+            }
+
+            // otherwise, carry on; update global colours if needed and add the event to the list
+
+            update_global_colors(&action, &mut fg_color, &mut bg_color);
             let tuple = (action, raw_bytes);
             let mut dto = VteEventDto::from(&tuple);
             update_dto_color(&mut dto, fg_color, bg_color);
@@ -190,7 +208,7 @@ fn main() -> Result<()> {
     });
 
     // start web server and attempt to open it in browser
-    let cloned_state = state;
+    let cloned_state = state.clone();
     let _webserver = runtime.spawn(async move {
         let app = Router::new()
             .route("/", get(root))
@@ -236,6 +254,12 @@ fn main() -> Result<()> {
             // EOF
             child.clone_killer().kill()?;
             drop(_clean_up);
+            let event_count = &state.all_dtos.blocking_lock().len();
+            println!(
+                "{}{}",
+                "Exited. Viewed ".cyan(),
+                format!("{} escape codes", event_count).magenta()
+            );
             // print_all_events(&state.all_events.blocking_lock());
             return Ok(());
         }
@@ -304,7 +328,7 @@ async fn stream_events(app_state: AppState, mut ws: WebSocket) {
 
     let mut rx = app_state.tx.subscribe();
     // throttle event sending so we can cut down on renders
-    const THROTTLE_DURATION: Duration = Duration::from_millis(10);
+    const THROTTLE_DURATION: Duration = Duration::from_millis(100);
     let mut batch = vec![];
     let mut next_send = Instant::now() + THROTTLE_DURATION;
 
@@ -313,16 +337,16 @@ async fn stream_events(app_state: AppState, mut ws: WebSocket) {
             // TODO rebuild this
             // optimization: if this is a string and the last item in the batch is also a string, concatenate them
             // this greatly cuts down on the number of events sent to the front-end
-            // if let VteEventDto::Print { string } = &e {
-            //     if let Some(VteEventDto::Print {
-            //         string: last_string,
-            //         ..
-            //     }) = batch.last_mut()
-            //     {
-            //         last_string.push_str(string);
-            //         continue;
-            //     }
-            // }
+            if let VteEventDto::Print { string, .. } = &e {
+                if let Some(VteEventDto::Print {
+                    string: last_string,
+                    ..
+                }) = batch.last_mut()
+                {
+                    last_string.push_str(string);
+                    continue;
+                }
+            }
 
             batch.push(e)
         }
@@ -432,12 +456,7 @@ impl From<&(Action, Vec<u8>)> for VteEventDto {
                 raw_bytes: sanitize_raw_bytes(raw_bytes),
             },
             Action::CSI(csi) => csi_to_dto(csi, sanitize_raw_bytes(raw_bytes)),
-            Action::Esc(e) => VteEventDto::GenericEscape {
-                title: Some(format!("ESC {e:?}")),
-                icon_svg: None,
-                tooltip: None,
-                raw_bytes: sanitize_raw_bytes(raw_bytes),
-            },
+            Action::Esc(e) => esc_to_dto(e, raw_bytes),
             Action::Sixel(_) => todo!("sixel not implemented yet"),
             Action::XtGetTcap(_) => todo!("xt get tcap not implemented yet"),
             Action::KittyImage(_) => todo!("kitty image not implemented yet"),
@@ -445,24 +464,57 @@ impl From<&(Action, Vec<u8>)> for VteEventDto {
     }
 }
 
+fn esc_to_dto(esc: &Esc, raw_bytes: &[u8]) -> VteEventDto {
+    let raw_bytes_str = sanitize_raw_bytes(raw_bytes);
+    match esc {
+        Esc::Unspecified { .. } => VteEventDto::GenericEscape {
+            title: None,
+            icon_svg: Some(iconify::svg!("mdi:question-mark-box").into()),
+            tooltip: Some("Unspecified escape sequence".into()),
+            raw_bytes: raw_bytes_str,
+        },
+        Esc::Code(code) => match code {
+            EscCode::StringTerminator => VteEventDto::GenericEscape {
+                title: Some("\\".into()),
+                icon_svg: None,
+                tooltip: Some("ST / String Terminator".into()),
+                raw_bytes: raw_bytes_str,
+            },
+            _ => VteEventDto::GenericEscape {
+                title: Some(format!("ESC {code:?}")),
+                icon_svg: None,
+                tooltip: None,
+                raw_bytes: raw_bytes_str,
+            },
+        },
+    }
+}
+
 fn ctrl_to_dto(ctrl: &ControlCode) -> VteEventDto {
-    if matches!(ctrl, ControlCode::CarriageReturn) {
-        return VteEventDto::LineBreak { title: "CR".into() };
-    }
-    if matches!(ctrl, ControlCode::LineFeed) {
-        return VteEventDto::LineBreak { title: "LF".into() };
-    }
-
     let as_byte = *ctrl as u8;
+    let raw_bytes = format!("{:#02x}", as_byte);
 
-    // let (title, tooltip, icon_svg) = match csi {
-
-    let title = format!("{ctrl:?}");
-    VteEventDto::GenericEscape {
-        title: Some(title),
-        icon_svg: None,
-        tooltip: None,
-        raw_bytes: format!("{:#02x}", as_byte),
+    match ctrl {
+        ControlCode::Bell => VteEventDto::GenericEscape {
+            title: None,
+            icon_svg: Some(iconify::svg!("mdi:bell").into()),
+            tooltip: Some("Bell".into()),
+            raw_bytes,
+        },
+        ControlCode::Backspace => VteEventDto::GenericEscape {
+            title: None,
+            icon_svg: Some(iconify::svg!("mdi:backspace").into()),
+            tooltip: Some("Backspace".into()),
+            raw_bytes,
+        },
+        ControlCode::LineFeed => VteEventDto::LineBreak { title: "LF".into() },
+        ControlCode::CarriageReturn => VteEventDto::LineBreak { title: "CR".into() },
+        _ => VteEventDto::GenericEscape {
+            title: Some(format!("{ctrl:?}")),
+            icon_svg: None,
+            tooltip: None,
+            raw_bytes,
+        },
     }
 }
 

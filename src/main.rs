@@ -495,6 +495,18 @@ fn esc_to_dto(esc: &Esc, raw_bytes: &[u8]) -> VteEventDto {
                 tooltip: Some("ST / String Terminator".into()),
                 raw_bytes: raw_bytes_str,
             },
+            EscCode::DecSaveCursorPosition => VteEventDto::GenericEscape {
+                title: None,
+                icon_svg: Some(iconify::svg!("mdi:content-save").into()),
+                tooltip: Some("Save cursor position".into()),
+                raw_bytes: raw_bytes_str,
+            },
+            EscCode::DecRestoreCursorPosition => VteEventDto::GenericEscape {
+                title: None,
+                icon_svg: Some(iconify::svg!("mdi:file-restore").into()),
+                tooltip: Some("Restore cursor position".into()),
+                raw_bytes: raw_bytes_str,
+            },
             _ => VteEventDto::GenericEscape {
                 title: Some(format!("ESC {code:?}")),
                 icon_svg: None,
@@ -538,7 +550,7 @@ fn csi_to_dto(csi: &CSI, raw_bytes: String) -> VteEventDto {
         CSI::Sgr(sgr) => match sgr {
             Sgr::Reset => (
                 None,
-                Some("SGR (Select Graphic Rendition) Reset".into()),
+                Some("SGR (Select Graphic Rendition) Reset (reset all styles)".into()),
                 Some(iconify::svg!("carbon:reset").into()),
             ),
             Sgr::Foreground(color) => (

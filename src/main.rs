@@ -457,9 +457,24 @@ impl From<&(Action, Vec<u8>)> for VteEventDto {
             },
             Action::CSI(csi) => csi_to_dto(csi, sanitize_raw_bytes(raw_bytes)),
             Action::Esc(e) => esc_to_dto(e, raw_bytes),
-            Action::Sixel(_) => todo!("sixel not implemented yet"),
-            Action::XtGetTcap(_) => todo!("xt get tcap not implemented yet"),
-            Action::KittyImage(_) => todo!("kitty image not implemented yet"),
+            Action::Sixel(_) => VteEventDto::GenericEscape {
+                title: Some("Sixel".into()),
+                icon_svg: Some(iconify::svg!("mdi:image").into()),
+                tooltip: Some("Sixel image".into()),
+                raw_bytes: sanitize_raw_bytes(raw_bytes),
+            },
+            Action::XtGetTcap(x) => VteEventDto::GenericEscape {
+                title: Some("XTGETTCAP".into()),
+                icon_svg: None,
+                tooltip: Some(format!("Get termcap, terminfo for: {}", x.join(", "))),
+                raw_bytes: sanitize_raw_bytes(raw_bytes),
+            },
+            Action::KittyImage(_) => VteEventDto::GenericEscape {
+                title: Some("Kitty".into()),
+                icon_svg: Some(iconify::svg!("mdi:image").into()),
+                tooltip: Some("Kitty image".into()),
+                raw_bytes: sanitize_raw_bytes(raw_bytes),
+            },
         }
     }
 }

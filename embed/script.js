@@ -17,30 +17,42 @@ url.protocol = url.protocol.replace("http", "ws");
 
 let events = [];
 
+function showTooltip(event) {
+  const tooltip = document.querySelector('#tooltip');
+  tooltip.style.display = 'block';
+  update(event.target);
+}
+
 function Event(props) {
   let dto = props.dto;
   const shared_classes = "w-fit outline outline-1 rounded-sm px-1 m-1 bg-slate-800"
   switch (dto.type) {
     case "Print":
-      return html`<span>${dto.string}</span>`;
+      if (!!dto.color && !!dto.bg_color) {
+        return html`<span style="color: ${dto.color} background-color: ${dto.bg_color}">${dto.string}</span>`
+      } else if (!!dto.color) {
+        return html`<span style="color: ${dto.color}">${dto.string}</span>`
+      } else if (!!dto.bg_color) {
+        return html`<span style="background-color: ${dto.bg_color}">${dto.string}</span>`
+      } else {
+        return html`<span>${dto.string}</span>`;
+      }
     case "GenericEscape": {
       let border = !!dto.tooltip ? "outline-blue-400" : "outline-slate-400";
-
-      let showTooltip = (event) => {
-        const tooltip = document.querySelector('#tooltip');
-        tooltip.style.display = 'block';
-        update(event.target);
-      }
-      return html`<span
+      let svg = dto.icon_svg ? html`<span class="inline-block align-middle" dangerouslySetInnerHTML=${{ __html: dto.icon_svg}}/>` : html``;
+      let title = dto.title ? html`<span>${dto.title}</span>` : ``;
+      return html`<div
         data-tooltip=${dto.tooltip}
         data-rawbytes=${dto.raw_bytes}
         onmouseenter=${showTooltip}
         onmouseleave=${hideTooltip}
         onfocus=${showTooltip}
         onblur=${hideTooltip}
-        class="inline-block ${shared_classes} ${border} "
-        >${dto.title}</span
-      >`;
+        class="inline-block ${shared_classes} ${border} space-x-1"
+        >
+          ${svg}
+          ${title}
+        </div>`;
     }
     case "LineBreak": {
       return html`

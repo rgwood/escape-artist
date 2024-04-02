@@ -256,7 +256,7 @@ fn main() -> Result<()> {
             drop(_clean_up);
             let event_count = &state.all_dtos.blocking_lock().len();
             println!(
-                "{}{}",
+                "\n{}{}",
                 "Exited. Viewed ".cyan(),
                 format!("{} escape codes", event_count).magenta()
             );
@@ -444,15 +444,15 @@ impl From<&(Action, Vec<u8>)> for VteEventDto {
             },
             Action::Control(ctrl) => ctrl_to_dto(ctrl),
             Action::DeviceControl(dcm) => VteEventDto::GenericEscape {
-                title: Some(format!("DCM {dcm:?}")),
+                title: Some("DCM".into()),
                 icon_svg: None,
-                tooltip: None,
+                tooltip: Some(format!("{dcm:?}")),
                 raw_bytes: sanitize_raw_bytes(raw_bytes),
             },
             Action::OperatingSystemCommand(osc) => VteEventDto::GenericEscape {
-                title: Some(format!("OSC {osc:?}")),
+                title: Some("OSC".into()),
                 icon_svg: None,
-                tooltip: None,
+                tooltip: Some(format!("{osc:?}")),
                 raw_bytes: sanitize_raw_bytes(raw_bytes),
             },
             Action::CSI(csi) => csi_to_dto(csi, sanitize_raw_bytes(raw_bytes)),

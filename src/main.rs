@@ -32,7 +32,9 @@ use rust_embed::RustEmbed;
 use serde::Serialize;
 use termwiz::{
     color::ColorSpec,
-    escape::{csi::Sgr, parser::Parser, Action, ControlCode, Esc, EscCode, CSI},
+    escape::{
+        csi::Sgr, parser::Parser, Action, ControlCode, Esc, EscCode, OperatingSystemCommand, CSI,
+    },
 };
 use tokio::{
     net::TcpListener,
@@ -449,12 +451,7 @@ impl From<&(Action, Vec<u8>)> for VteEventDto {
                 tooltip: Some(format!("{dcm:?}")),
                 raw_bytes: sanitize_raw_bytes(raw_bytes),
             },
-            Action::OperatingSystemCommand(osc) => VteEventDto::GenericEscape {
-                title: Some("OSC".into()),
-                icon_svg: None,
-                tooltip: Some(format!("{osc:?}")),
-                raw_bytes: sanitize_raw_bytes(raw_bytes),
-            },
+            Action::OperatingSystemCommand(osc) => osc_to_dto(osc, raw_bytes),
             Action::CSI(csi) => csi_to_dto(csi, sanitize_raw_bytes(raw_bytes)),
             Action::Esc(e) => esc_to_dto(e, raw_bytes),
             Action::Sixel(_) => VteEventDto::GenericEscape {
@@ -476,6 +473,32 @@ impl From<&(Action, Vec<u8>)> for VteEventDto {
                 raw_bytes: sanitize_raw_bytes(raw_bytes),
             },
         }
+    }
+}
+
+fn osc_to_dto(osc: &Box<OperatingSystemCommand>, raw_bytes: &[u8]) -> VteEventDto {
+    let raw_bytes_str = sanitize_raw_bytes(raw_bytes);
+    match osc.as_ref() {
+        OperatingSystemCommand::SetHyperlink(link) => match link {
+            Some(link) => VteEventDto::GenericEscape {
+                title: None,
+                icon_svg: Some(iconify::svg!("mdi:link").into()),
+                tooltip: Some(format!("Set hyperlink: {link}")),
+                raw_bytes: raw_bytes_str,
+            },
+            None => VteEventDto::GenericEscape {
+                title: None,
+                icon_svg: Some(iconify::svg!("mdi:link-off").into()),
+                tooltip: Some("Clear hyperlink".into()),
+                raw_bytes: raw_bytes_str,
+            },
+        },
+        _ => VteEventDto::GenericEscape {
+            title: Some("OSC".into()),
+            icon_svg: None,
+            tooltip: Some(format!("{osc:?}")),
+            raw_bytes: sanitize_raw_bytes(raw_bytes),
+        },
     }
 }
 
@@ -507,10 +530,18 @@ fn esc_to_dto(esc: &Esc, raw_bytes: &[u8]) -> VteEventDto {
                 tooltip: Some("Restore cursor position".into()),
                 raw_bytes: raw_bytes_str,
             },
+            EscCode::AsciiCharacterSetG0 | EscCode::AsciiCharacterSetG1 => {
+                VteEventDto::GenericEscape {
+                    title: None,
+                    icon_svg: Some(iconify::svg!("mdi:alphabetical-variant").into()),
+                    tooltip: Some(format!("{code:?}")),
+                    raw_bytes: raw_bytes_str,
+                }
+            }
             _ => VteEventDto::GenericEscape {
-                title: Some(format!("ESC {code:?}")),
+                title: Some(format!("ESC")),
                 icon_svg: None,
-                tooltip: None,
+                tooltip: Some(format!("{code:?}")),
                 raw_bytes: raw_bytes_str,
             },
         },
@@ -568,7 +599,7 @@ fn csi_to_dto(csi: &CSI, raw_bytes: String) -> VteEventDto {
         },
         CSI::Cursor(cursor) => (
             None,
-            Some(format!("Move cursor: {cursor:?}")),
+            Some(format!("Update cursor: {cursor:?}")),
             Some(iconify::svg!("ph:cursor-text-fill").into()),
         ),
         // CSI::Edit(_) => todo!(),

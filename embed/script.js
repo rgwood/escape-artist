@@ -38,7 +38,6 @@ function Event(props) {
         return html`<span>${dto.string}</span>`;
       }
     case "GenericEscape": {
-      let border = !!dto.tooltip ? "outline-blue-400" : "outline-slate-400";
       let svg = dto.icon_svg ? html`<span class="inline-block align-middle" dangerouslySetInnerHTML=${{ __html: dto.icon_svg}}/>` : html``;
       let title = dto.title ? html`<span>${dto.title}</span>` : ``;
       return html`<div
@@ -48,7 +47,7 @@ function Event(props) {
         onmouseleave=${hideTooltip}
         onfocus=${showTooltip}
         onblur=${hideTooltip}
-        class="inline-block ${shared_classes} ${border} space-x-1"
+        class="inline-block outline-slate-400 ${shared_classes} space-x-1"
         >
           ${svg}
           ${title}

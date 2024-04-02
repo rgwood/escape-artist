@@ -16,13 +16,14 @@ https://poor.dev/blog/terminal-anatomy/
 
 # TO DO
 
+- [ ] Centralize the "add an Action to the Vec of all records and send the new action to any listeners (debounced)" logic
+- [ ] Make newlines take up less vertical space. Solution: Add a new InvisibleLineBreak dto that we send before+after CR+LF
 - [ ] handle tab/spaces better
   - should show \t inline or turn it into multiple spaces
   - leading spaces should indent lines
 - [x] use a nerd font
 - [x] handle failure to get a socket with a nicer error message
 - [x] print stack trace automatically
-- [ ] handle left arrow cursor movement better, currently reported as "Execute "
 - [ ] show raw bytes for line breaks
 - [x] embed all js libs so it works offline
 - [x] add an option to log to a file

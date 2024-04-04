@@ -469,6 +469,7 @@ dependencies = [
  "clap",
  "crossterm",
  "iconify",
+ "is-docker",
  "mime_guess",
  "open",
  "portable-pty",

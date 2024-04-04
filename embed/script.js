@@ -29,7 +29,7 @@ function Event(props) {
   switch (dto.type) {
     case "Print":
       if (!!dto.color && !!dto.bg_color) {
-        return html`<span style="color: ${dto.color} background-color: ${dto.bg_color}">${dto.string}</span>`
+        return html`<span style="color: ${dto.color}; background-color: ${dto.bg_color}">${dto.string}</span>`
       } else if (!!dto.color) {
         return html`<span style="color: ${dto.color}">${dto.string}</span>`
       } else if (!!dto.bg_color) {

@@ -29,7 +29,7 @@ rand = "0.8.5"
 signal-hook = "0.3.15"
 termwiz = "0.22.0"
 ansi_colours = "1.2.2"
-iconify = "0.2.6"
+iconify = "0.3.0"
 
 [profile.release]
 lto = true      # Enable Link Time Optimization

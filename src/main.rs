@@ -4,7 +4,7 @@ use std::{
     net::SocketAddr,
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicI64, Ordering},
         Arc,
     },
     thread,
@@ -96,6 +96,7 @@ fn main() -> Result<()> {
     let _clean_up = CleanUp;
     let (tx, _) = broadcast::channel::<VteEventDto>(10000); // capacity arbitrarily chosen
     let state = AppState {
+        sequence_count: Arc::new(AtomicI64::new(0)),
         all_dtos: Arc::new(Mutex::new(vec![])),
         tx,
     };
@@ -178,7 +179,6 @@ fn main() -> Result<()> {
         while let Some((action, raw_bytes)) = action_receiver.recv().await {
             // optimization: if the last DTO was a print and this action is a print, concatenate them
             // this greatly cuts down on the number of events sent to the front-end
-
             if let Some(VteEventDto::Print {
                 string: last_string,
                 ..
@@ -191,6 +191,8 @@ fn main() -> Result<()> {
                     let _ = cloned_state.tx.send(dto);
                     continue;
                 }
+            } else {
+                cloned_state.sequence_count.fetch_add(1, Ordering::Relaxed);
             }
 
             // otherwise, carry on; update global colours if needed and add the event to the list
@@ -256,11 +258,11 @@ fn main() -> Result<()> {
             // EOF
             child.clone_killer().kill()?;
             drop(_clean_up);
-            let event_count = &state.all_dtos.blocking_lock().len();
+            let sequence_count = state.sequence_count.load(Ordering::Relaxed);
             println!(
                 "\n{}{}",
-                "Exited. Viewed ".cyan(),
-                format!("{} escape codes", event_count).magenta()
+                "Exited. Processed ".cyan(),
+                format!("{} escape sequences", sequence_count).magenta()
             );
             // print_all_events(&state.all_events.blocking_lock());
             return Ok(());
@@ -280,6 +282,7 @@ fn initialize_environment() {
 
 #[derive(Clone)]
 struct AppState {
+    sequence_count: Arc<AtomicI64>,
     all_dtos: Arc<Mutex<Vec<VteEventDto>>>,
     tx: broadcast::Sender<VteEventDto>,
 }

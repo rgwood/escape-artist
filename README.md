@@ -2,7 +2,7 @@
 
 Escape Artist is a tool for seeing ANSI escape codes in terminal applications. You interact with your shell just like you normally would, and it shows the normally-invisible escape codes in a web UI:
 
-![screenshot](screenshot.jpg)
+![screenshot](screenshot.png)
 
 ## Installation
 

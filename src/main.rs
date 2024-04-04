@@ -27,7 +27,6 @@ use axum::{
 use clap::Parser as ClapParser;
 use crossterm::{cursor, execute, style::Stylize, terminal};
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
-use rand::seq::SliceRandom;
 use rust_embed::RustEmbed;
 use serde::Serialize;
 use termwiz::{
@@ -78,10 +77,8 @@ fn main() -> Result<()> {
         bail!("SHELL environment variable not found; either set it or use --shell")
     };
 
-    const EMOJI_POOL: [&str; 10] = ["🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🎨", "🤔"];
-    let random_emoji = *EMOJI_POOL.choose(&mut rand::thread_rng()).unwrap();
     println!(
-        "{}{}{}{} {}",
+        "{}{}{}{} 🎨",
         "Launching ".cyan(),
         PathBuf::from(&shell_path)
             .file_name()
@@ -90,7 +87,6 @@ fn main() -> Result<()> {
             .magenta(),
         " in Escape Artist v".cyan(),
         env!("CARGO_PKG_VERSION").cyan(),
-        random_emoji,
     );
 
     let _clean_up = CleanUp;

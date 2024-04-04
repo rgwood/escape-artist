@@ -53,6 +53,22 @@ function Event(props) {
           ${title}
         </div>`;
     }
+    case "ColorEscape": {
+      let svg = dto.icon_svg ? html`<span class="inline-block align-middle" dangerouslySetInnerHTML=${{ __html: dto.icon_svg}}/>` : html``;
+      let title = dto.title ? html`<span>${dto.title}</span>` : ``;
+      return html`<div
+        data-tooltip=${dto.tooltip}
+        data-rawbytes=${dto.raw_bytes}
+        onmouseenter=${showTooltip}
+        onmouseleave=${hideTooltip}
+        onfocus=${showTooltip}
+        onblur=${hideTooltip}
+        class="inline-block outline-[${dto.color}] ${shared_classes} space-x-1"
+        >
+          ${svg}
+          ${title}
+        </div>`;
+    }
     case "LineBreak": {
       return html`
       <div class="${shared_classes} outline-slate-500 text-xs">

@@ -198,7 +198,7 @@ fn main() -> Result<()> {
             update_global_colors(&action, &mut fg_color, &mut bg_color);
             let tuple = (action, raw_bytes);
             let mut dto = VteEventDto::from(&tuple);
-            update_dto_color(&mut dto, fg_color, bg_color);
+            update_print_colors(&mut dto, fg_color, bg_color);
 
             {
                 let mut dtos = cloned_state.all_dtos.lock().await;
@@ -370,7 +370,7 @@ async fn stream_events(app_state: AppState, mut ws: WebSocket) {
     }
 }
 
-fn update_dto_color(dto: &mut VteEventDto, fg_color: ColorSpec, bg_color: ColorSpec) {
+fn update_print_colors(dto: &mut VteEventDto, fg_color: ColorSpec, bg_color: ColorSpec) {
     if let VteEventDto::Print {
         color: dto_color,
         bg_color: dto_bg_color,
@@ -423,6 +423,13 @@ enum VteEventDto {
         title: Option<String>,
         icon_svg: Option<String>,
         tooltip: Option<String>,
+        raw_bytes: String,
+    },
+    ColorEscape {
+        title: Option<String>,
+        icon_svg: Option<String>,
+        tooltip: Option<String>,
+        color: String,
         raw_bytes: String,
     },
     LineBreak {
@@ -584,17 +591,24 @@ fn csi_to_dto(csi: &CSI, raw_bytes: String) -> VteEventDto {
                 Some("SGR (Select Graphic Rendition) Reset (reset all styles)".into()),
                 Some(iconify::svg!("carbon:reset").into()),
             ),
-            Sgr::Foreground(color) => (
-                Some("FG".into()),
-                Some(format!("Set foreground color to: {color:?}")),
-                None,
-            ),
-            Sgr::Background(color) => (
-                Some("BG".into()),
-                Some(format!("Set background color to: {color:?}")),
-                None,
-            ),
-
+            Sgr::Foreground(color) => {
+                return VteEventDto::ColorEscape {
+                    title: Some("FG".into()),
+                    icon_svg: None,
+                    tooltip: Some(format!("Set foreground color to: {color:?}")),
+                    color: hex_color(color).unwrap_or("black".into()),
+                    raw_bytes,
+                }
+            }
+            Sgr::Background(color) => {
+                return VteEventDto::ColorEscape {
+                    title: Some("BG".into()),
+                    icon_svg: None,
+                    tooltip: Some(format!("Set background color to: {color:?}")),
+                    color: hex_color(color).unwrap_or("black".into()),
+                    raw_bytes,
+                }
+            }
             _ => (Some("SGR".into()), Some(format!("Set {sgr:?}")), None),
         },
         CSI::Cursor(cursor) => (

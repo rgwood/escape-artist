@@ -153,10 +153,11 @@ fn main() -> Result<()> {
 
                 let actions = parser.parse_as_vec(&[*byte]);
                 if !actions.is_empty() {
+                    // 1 byte sequence can represent multiple actions
+                    let cmd_bytes = take(&mut curr_cmd_bytes);
                     for action in actions {
-                        let cmd_bytes = take(&mut curr_cmd_bytes);
                         // this may fail if the receiver has been dropped because we're exiting
-                        let _ = action_sender.blocking_send((action, cmd_bytes));
+                        let _ = action_sender.blocking_send((action, cmd_bytes.clone()));
                     }
                 }
             }

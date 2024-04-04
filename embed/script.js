@@ -69,11 +69,14 @@ function Event(props) {
           ${title}
         </div>`;
     }
+    case "InvisibleLineBreak": {
+      return html`<div/>`;
+    }
     case "LineBreak": {
       return html`
-      <div class="${shared_classes} outline-slate-500 text-xs">
+      <span class="${shared_classes} outline-slate-500 text-xs">
         ${dto.title}
-      </div>`;
+      </span>`;
     }
     case "Disconnected": {
       return html`<div class="${shared_classes} outline-red-500">

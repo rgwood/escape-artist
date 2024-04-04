@@ -154,10 +154,14 @@ fn main() -> Result<()> {
 
             for byte in &bytes {
                 curr_cmd_bytes.push(*byte);
-                if let Some((action, _)) = parser.parse_first(&[*byte]) {
-                    let cmd_bytes = take(&mut curr_cmd_bytes);
-                    // this may fail if the receiver has been dropped because we're exiting
-                    let _ = action_sender.blocking_send((action, cmd_bytes));
+
+                let actions = parser.parse_as_vec(&[*byte]);
+                if !actions.is_empty() {
+                    for action in actions {
+                        let cmd_bytes = take(&mut curr_cmd_bytes);
+                        // this may fail if the receiver has been dropped because we're exiting
+                        let _ = action_sender.blocking_send((action, cmd_bytes));
+                    }
                 }
             }
 
@@ -175,6 +179,8 @@ fn main() -> Result<()> {
     runtime.spawn(async move {
         let mut fg_color = ColorSpec::Default;
         let mut bg_color = ColorSpec::Default;
+
+        let mut last_was_line_break = false;
 
         while let Some((action, raw_bytes)) = action_receiver.recv().await {
             // optimization: if the last DTO was a print and this action is a print, concatenate them
@@ -202,12 +208,27 @@ fn main() -> Result<()> {
             let mut dto = VteEventDto::from(&tuple);
             update_print_colors(&mut dto, fg_color, bg_color);
 
+            // emit an invisible line break DTO if we're transitioning from a line break to a non-line break or vice versa
+            let is_line_break = matches!(&dto, VteEventDto::LineBreak { .. });
+            let dtos_to_send = if is_line_break && !last_was_line_break {
+                vec![VteEventDto::InvisibleLineBreak {}, dto]
+            } else if !is_line_break && last_was_line_break {
+                vec![VteEventDto::InvisibleLineBreak {}, dto]
+            } else {
+                vec![dto]
+            };
+            last_was_line_break = is_line_break;
+
             {
                 let mut dtos = cloned_state.all_dtos.lock().await;
-                dtos.push(dto.clone());
+                for dto in dtos_to_send.iter() {
+                    dtos.push(dto.clone());
+                }
             }
 
-            let _ = cloned_state.tx.send(dto);
+            for dto in dtos_to_send {
+                let _ = cloned_state.tx.send(dto);
+            }
         }
     });
 
@@ -435,6 +456,7 @@ enum VteEventDto {
         color: String,
         raw_bytes: String,
     },
+    InvisibleLineBreak {},
     LineBreak {
         title: String,
     },

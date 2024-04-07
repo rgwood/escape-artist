@@ -403,21 +403,19 @@ fn update_print_colors(dto: &mut VteEventDto, fg_color: ColorSpec, bg_color: Col
 }
 
 fn update_global_colors(action: &Action, fg_color: &mut ColorSpec, bg_color: &mut ColorSpec) {
-    if let Action::CSI(csi) = action {
-        if let CSI::Sgr(sgr) = csi {
-            match sgr {
-                Sgr::Foreground(color) => {
-                    *fg_color = color.clone();
-                }
-                Sgr::Background(color) => {
-                    *bg_color = color.clone();
-                }
-                Sgr::Reset => {
-                    *fg_color = ColorSpec::Default;
-                    *bg_color = ColorSpec::Default;
-                }
-                _ => {}
+    if let Action::CSI(CSI::Sgr(sgr)) = action {
+        match sgr {
+            Sgr::Foreground(color) => {
+                *fg_color = *color;
             }
+            Sgr::Background(color) => {
+                *bg_color = *color;
+            }
+            Sgr::Reset => {
+                *fg_color = ColorSpec::Default;
+                *bg_color = ColorSpec::Default;
+            }
+            _ => {}
         }
     }
 }
@@ -504,9 +502,9 @@ impl From<&(Action, Vec<u8>)> for VteEventDto {
     }
 }
 
-fn osc_to_dto(osc: &Box<OperatingSystemCommand>, raw_bytes: &[u8]) -> VteEventDto {
+fn osc_to_dto(osc: &OperatingSystemCommand, raw_bytes: &[u8]) -> VteEventDto {
     let raw_bytes_str = sanitize_raw_bytes(raw_bytes);
-    match osc.as_ref() {
+    match osc {
         OperatingSystemCommand::SetHyperlink(link) => match link {
             Some(link) => VteEventDto::GenericEscape {
                 title: None,
@@ -567,7 +565,7 @@ fn esc_to_dto(esc: &Esc, raw_bytes: &[u8]) -> VteEventDto {
                 }
             }
             _ => VteEventDto::GenericEscape {
-                title: Some(format!("ESC")),
+                title: Some("ESC".into()),
                 icon_svg: None,
                 tooltip: Some(format!("{code:?}")),
                 raw_bytes: raw_bytes_str,
@@ -661,8 +659,7 @@ fn csi_to_dto(csi: &CSI, raw_bytes: String) -> VteEventDto {
 fn sanitize_raw_bytes(raw_bytes: &[u8]) -> String {
     let ret = String::from_utf8_lossy(raw_bytes);
     // TODO: there's gotta be a better way to do this than a line for every interesting control char
-    let ret = ret.replace("", r"\x1b");
-    ret
+    ret.replace("", r"\x1b")
 }
 
 pub struct StaticFile<T>(pub T);
@@ -695,8 +692,8 @@ where
 pub fn clap_v3_style() -> Styles {
     use clap::builder::styling::AnsiColor;
     Styles::styled()
-    .header(AnsiColor::Yellow.on_default())
-    .usage(AnsiColor::Green.on_default())
-    .literal(AnsiColor::Green.on_default())
-    .placeholder(AnsiColor::Green.on_default())
+        .header(AnsiColor::Yellow.on_default())
+        .usage(AnsiColor::Green.on_default())
+        .literal(AnsiColor::Green.on_default())
+        .placeholder(AnsiColor::Green.on_default())
 }

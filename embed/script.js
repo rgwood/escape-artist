@@ -113,7 +113,6 @@ function renderAndScroll() {
       </div>
       <div id="arrow" class="absolute bg-slate-800 w-2 h-2 rotate-45"></div>
     </div>
-    <a href="/help.html" class="bg-slate-800 hover:bg-cyan-900 p-0 font-bold rounded-sm outline outline-1 outline-slate-400 m-2 w-8 text-center fixed top-0 right-0">❔</a>
     ${events.map((event) => html`<${Event} dto="${event}" />`)}
     `,
     document.body

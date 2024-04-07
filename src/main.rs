@@ -591,6 +591,12 @@ fn ctrl_to_dto(ctrl: &ControlCode) -> VteEventDto {
             tooltip: Some("Backspace".into()),
             raw_bytes,
         },
+        ControlCode::HorizontalTab => VteEventDto::GenericEscape {
+            title: None,
+            icon_svg: Some(iconify::svg!("mdi:keyboard-tab").into()),
+            tooltip: Some("Tab".into()),
+            raw_bytes,
+        },
         ControlCode::LineFeed => VteEventDto::LineBreak { title: "LF".into() },
         ControlCode::CarriageReturn => VteEventDto::LineBreak { title: "CR".into() },
         _ => VteEventDto::GenericEscape {

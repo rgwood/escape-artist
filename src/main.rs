@@ -34,7 +34,9 @@ use serde::Serialize;
 use termwiz::{
     color::ColorSpec,
     escape::{
-        csi::Sgr, parser::Parser, Action, ControlCode, Esc, EscCode, OperatingSystemCommand, CSI,
+        csi::{Edit, EraseInDisplay, EraseInLine, Sgr},
+        parser::Parser,
+        Action, ControlCode, Esc, EscCode, OperatingSystemCommand, CSI,
     },
 };
 use tokio::{
@@ -644,6 +646,28 @@ fn csi_to_dto(csi: &CSI, raw_bytes: String) -> VteEventDto {
             Some(format!("Update cursor: {cursor:?}")),
             Some(iconify::svg!("ph:cursor-text-fill").into()),
         ),
+        CSI::Edit(edit) => match edit {
+            Edit::EraseInLine(erase) => (
+                None,
+                Some(match erase {
+                    EraseInLine::EraseToEndOfLine => "Erase to end of line".into(),
+                    EraseInLine::EraseToStartOfLine => "Erase to start of line".into(),
+                    EraseInLine::EraseLine => "Erase line".into(),
+                }),
+                Some(iconify::svg!("mdi:eraser").into()),
+            ),
+            Edit::EraseInDisplay(erase) => (
+                None,
+                Some(match erase {
+                    EraseInDisplay::EraseToEndOfDisplay => "Erase to end of display".into(),
+                    EraseInDisplay::EraseToStartOfDisplay => "Erase to start of display".into(),
+                    EraseInDisplay::EraseDisplay => "Erase display".into(),
+                    EraseInDisplay::EraseScrollback => "Erase scrollback".into(),
+                }),
+                Some(iconify::svg!("mdi:eraser").into()),
+            ),
+            _ => (Some("Edit".into()), Some(format!("{edit:?}")), None),
+        },
         // CSI::Edit(_) => todo!(),
         // CSI::Mode(_) => todo!(),
         // CSI::Device(_) => todo!(),

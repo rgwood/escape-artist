@@ -23,7 +23,7 @@ use axum::{
     routing::get,
     Router,
 };
-use clap::Parser as ClapParser;
+use clap::{builder::Styles, Parser as ClapParser};
 use crossterm::{cursor, execute, style::Stylize, terminal};
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use rust_embed::RustEmbed;
@@ -41,7 +41,7 @@ use tokio::{
 };
 
 #[derive(clap::Parser, Clone)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version, about, long_about = None, styles = clap_v3_style())]
 struct Cli {
     /// The port for the web server
     #[arg(short, long, default_value = "3000")]
@@ -689,4 +689,14 @@ where
                 .unwrap(),
         }
     }
+}
+
+// IMO the v3 style was nice and it's dumb that clap removed colour in v4
+pub fn clap_v3_style() -> Styles {
+    use clap::builder::styling::AnsiColor;
+    Styles::styled()
+    .header(AnsiColor::Yellow.on_default())
+    .usage(AnsiColor::Green.on_default())
+    .literal(AnsiColor::Green.on_default())
+    .placeholder(AnsiColor::Green.on_default())
 }

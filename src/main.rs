@@ -2,7 +2,6 @@ use std::{
     io::{stdout, Read, Write},
     mem::take,
     net::SocketAddr,
-    path::PathBuf,
     sync::{
         atomic::{AtomicBool, AtomicI64, Ordering},
         Arc,
@@ -44,10 +43,6 @@ use tokio::{
 #[derive(clap::Parser, Clone)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    /// Path to the shell to be launched. If not specified, will use the $SHELL environment variable
-    #[arg(short, long)]
-    shell: Option<String>,
-
     /// The port for the web server
     #[arg(short, long, default_value = "3000")]
     port: u16,
@@ -55,6 +50,10 @@ struct Cli {
     /// Log stdout to a file (stdout.txt)
     #[arg(short, long, default_value = "false")]
     log_to_file: bool,
+
+    /// Command to be launched, optionally with args. If not specified, will use the $SHELL environment variable
+    #[arg(last = true)]
+    argv: Vec<String>,
 }
 
 fn main() -> Result<()> {
@@ -69,22 +68,21 @@ fn main() -> Result<()> {
     }
 
     let cli = Cli::parse();
-    let shell_path = if let Some(s) = cli.shell {
-        s
-    } else if let Ok(path) = std::env::var("SHELL") {
-        path
+
+    let argv = if cli.argv.is_empty() {
+        if let Ok(shell) = std::env::var("SHELL") {
+            vec![shell]
+        } else {
+            bail!("SHELL environment variable not found; either set it or use --shell")
+        }
     } else {
-        bail!("SHELL environment variable not found; either set it or use --shell")
+        cli.argv
     };
 
     println!(
         "{}{}{}{} 🎨",
         "Launching ".cyan(),
-        PathBuf::from(&shell_path)
-            .file_name()
-            .expect("get file name")
-            .to_string_lossy()
-            .magenta(),
+        argv.join(" ").magenta(),
         " in Escape Artist v".cyan(),
         env!("CARGO_PKG_VERSION").cyan(),
     );
@@ -118,7 +116,8 @@ fn main() -> Result<()> {
 
     let mut stdin = std::io::stdin();
 
-    let mut command = CommandBuilder::new(shell_path);
+    let mut command = CommandBuilder::new(argv[0].clone());
+    command.args(&argv[1..]);
     if let Ok(cwd) = std::env::current_dir() {
         command.cwd(cwd);
     }

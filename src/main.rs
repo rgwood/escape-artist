@@ -23,7 +23,10 @@ use axum::{
     routing::get,
     Router,
 };
-use clap::{builder::Styles, Parser as ClapParser};
+use clap::{
+    builder::{StyledStr, Styles},
+    Parser as ClapParser,
+};
 use crossterm::{cursor, execute, style::Stylize, terminal};
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use rust_embed::RustEmbed;
@@ -41,7 +44,7 @@ use tokio::{
 };
 
 #[derive(clap::Parser, Clone)]
-#[command(author, version, about, long_about = None, styles = clap_v3_style())]
+#[command(author, version, about, long_about = None, styles = clap_v3_style(), after_help = after_help())]
 struct Cli {
     /// The port for the web server
     #[arg(short, long, default_value = "3000")]
@@ -702,4 +705,12 @@ pub fn clap_v3_style() -> Styles {
         .usage(AnsiColor::Green.on_default())
         .literal(AnsiColor::Green.on_default())
         .placeholder(AnsiColor::Green.on_default())
+}
+
+fn after_help() -> StyledStr {
+    format!("{}\n{}\n\n{}",
+    "More Info:".yellow(),
+    "This is a tool for seeing ANSI escape codes in terminal applications. You interact with your shell, and it shows the normally-invisible escape codes in a web UI.",
+    "It's written+maintained by Reilly Wood, and the latest version can be found at https://github.com/rgwood/escape-artist/")
+    .into()
 }

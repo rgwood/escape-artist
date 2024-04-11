@@ -278,7 +278,7 @@ fn main() -> Result<()> {
 
         if bytes.iter().any(|b| *b == 0x4) {
             // EOF
-            child.clone_killer().kill()?;
+            _ = child.clone_killer().kill();
             drop(_clean_up);
             let sequence_count = state.sequence_count.load(Ordering::Relaxed);
             println!(

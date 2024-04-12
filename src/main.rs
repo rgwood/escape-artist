@@ -1,8 +1,14 @@
 use std::{
-    fs::File, io::{stdout, Read, Write}, mem::take, net::SocketAddr, sync::{
+    fs::File,
+    io::{stdout, Read, Write},
+    mem::take,
+    net::SocketAddr,
+    sync::{
         atomic::{AtomicBool, AtomicI64, Ordering},
         Arc,
-    }, thread, time::Duration
+    },
+    thread,
+    time::Duration,
 };
 
 use ansi_colours::rgb_from_ansi256;
@@ -89,9 +95,6 @@ fn main() -> Result<()> {
 
     let runtime = tokio::runtime::Runtime::new()?;
 
-    terminal::enable_raw_mode()?;
-    let _clean_up = CleanUp;
-
     if let Some(file) = &cli.replay_file {
         println!(
             "{}{}{}{} 🎨",
@@ -105,8 +108,10 @@ fn main() -> Result<()> {
         let reader = File::open(file)?;
         // Watch the child's output, pump it into the VTE parser/performer, and forward it to the terminal
         // We use a thread here because reading from the pty is blocking
-        thread::spawn(move || parse_raw_output(cli.log_to_file, false, Box::new(reader), action_sender));
-        
+        thread::spawn(move || {
+            parse_raw_output(cli.log_to_file, false, Box::new(reader), action_sender)
+        });
+
         let cloned_state = state.clone();
         runtime.spawn(process_actions(action_receiver, cloned_state));
 
@@ -116,6 +121,9 @@ fn main() -> Result<()> {
             format!("http://localhost:{}", &cli.port).magenta(),
             " to view terminal escape codes, type CTRL+D to exit".cyan()
         );
+
+        terminal::enable_raw_mode()?;
+        let _clean_up = CleanUp;
 
         // start web server and attempt to open it in browser
         let cloned_state = state.clone();
@@ -171,7 +179,8 @@ fn main() -> Result<()> {
         " to view terminal escape codes, type CTRL+D to exit".cyan()
     );
     println!();
-    
+    terminal::enable_raw_mode()?;
+    let _clean_up = CleanUp;
 
     let mut stdin = std::io::stdin();
 
@@ -249,9 +258,9 @@ async fn run_webserver(cloned_state: AppState, cli: Cli) {
     let url = format!("http://localhost:{}", cli.port);
     let _ = open::that(url);
     let addr = SocketAddr::from(([127, 0, 0, 1], cli.port));
-    let listener = TcpListener::bind(addr).await.expect(
-        "Failed to bind to socket. Maybe another service is already using the same port",
-    );
+    let listener = TcpListener::bind(addr)
+        .await
+        .expect("Failed to bind to socket. Maybe another service is already using the same port");
     axum::serve(listener, app)
         .await
         .expect("Failed to start HTTP server.");

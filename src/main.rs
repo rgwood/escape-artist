@@ -1,4 +1,5 @@
 use std::{
+    fs::File,
     io::{stdout, Read, Write},
     mem::take,
     net::SocketAddr,
@@ -41,7 +42,11 @@ use termwiz::{
 };
 use tokio::{
     net::TcpListener,
-    sync::{broadcast, Mutex},
+    sync::{
+        broadcast,
+        mpsc::{channel, Receiver, Sender},
+        Mutex,
+    },
     time::{timeout_at, Instant},
 };
 
@@ -51,6 +56,9 @@ struct Cli {
     /// The port for the web server
     #[arg(short, long, default_value = "3000")]
     port: u16,
+
+    #[arg(short, long)]
+    replay_file: Option<String>,
 
     /// Log stdout to a file (stdout.txt)
     #[arg(short, long, default_value = "false")]
@@ -74,6 +82,68 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
+    if cli.replay_file.is_some() && !cli.argv.is_empty() {
+        bail!("Cannot specify a replay file and a command to run at the same time")
+    }
+
+    let (tx, _) = broadcast::channel::<VteEventDto>(10000); // capacity arbitrarily chosen
+    let state = AppState {
+        sequence_count: Arc::new(AtomicI64::new(0)),
+        all_dtos: Arc::new(Mutex::new(vec![])),
+        tx,
+    };
+
+    let runtime = tokio::runtime::Runtime::new()?;
+
+    if let Some(file) = &cli.replay_file {
+        println!(
+            "{}{}{}{} 🎨",
+            "Replaying ".cyan(),
+            file.clone().magenta(),
+            " in Escape Artist v".cyan(),
+            env!("CARGO_PKG_VERSION").cyan(),
+        );
+        let (action_sender, action_receiver) = channel::<(Action, Vec<u8>)>(10000);
+
+        let reader = File::open(file)?;
+        // Watch the child's output, pump it into the VTE parser/performer, and forward it to the terminal
+        // We use a thread here because reading from the pty is blocking
+        thread::spawn(move || {
+            parse_raw_output(cli.log_to_file, false, Box::new(reader), action_sender)
+        });
+
+        let cloned_state = state.clone();
+        runtime.spawn(process_actions(action_receiver, cloned_state));
+
+        println!(
+            "{}{}{}",
+            "Open ".cyan(),
+            format!("http://localhost:{}", &cli.port).magenta(),
+            " to view terminal escape codes, type CTRL+D to exit".cyan()
+        );
+
+        terminal::enable_raw_mode()?;
+        let _clean_up = CleanUp;
+
+        // start web server and attempt to open it in browser
+        let cloned_state = state.clone();
+        runtime.spawn(run_webserver(cloned_state, cli));
+
+        // read stdin, exit on ctrl+d
+        let mut stdin = std::io::stdin();
+        let mut buffer = [0; 1024];
+        loop {
+            let n = stdin.read(&mut buffer)?;
+            let bytes = buffer[..n].to_vec();
+            if bytes.iter().any(|b| *b == 0x4) {
+                // EOF
+                break;
+            }
+        }
+
+        return Ok(());
+    }
+
     let argv = if cli.argv.is_empty() {
         if let Ok(shell) = std::env::var("SHELL") {
             vec![shell]
@@ -81,7 +151,7 @@ fn main() -> Result<()> {
             bail!("SHELL environment variable not found; either set it or use --shell")
         }
     } else {
-        cli.argv
+        cli.argv.clone()
     };
 
     println!(
@@ -91,14 +161,6 @@ fn main() -> Result<()> {
         " in Escape Artist v".cyan(),
         env!("CARGO_PKG_VERSION").cyan(),
     );
-
-    let _clean_up = CleanUp;
-    let (tx, _) = broadcast::channel::<VteEventDto>(10000); // capacity arbitrarily chosen
-    let state = AppState {
-        sequence_count: Arc::new(AtomicI64::new(0)),
-        all_dtos: Arc::new(Mutex::new(vec![])),
-        tx,
-    };
 
     let pty_system = native_pty_system();
 
@@ -118,6 +180,7 @@ fn main() -> Result<()> {
     );
     println!();
     terminal::enable_raw_mode()?;
+    let _clean_up = CleanUp;
 
     let mut stdin = std::io::stdin();
 
@@ -132,128 +195,22 @@ fn main() -> Result<()> {
     // This reads output (stderr and stdout multiplexed into 1 stream) from child
     let mut reader = pair.master.try_clone_reader()?;
 
-    let (action_sender, mut action_receiver) =
-        tokio::sync::mpsc::channel::<(Action, Vec<u8>)>(10000);
+    if let Some(file) = &cli.replay_file {
+        reader = Box::new(std::fs::File::open(file)?);
+    }
+
+    let (action_sender, action_receiver) = channel::<(Action, Vec<u8>)>(10000);
 
     // Watch the child's output, pump it into the VTE parser/performer, and forward it to the terminal
     // We use a thread here because reading from the pty is blocking
-    thread::spawn(move || -> Result<()> {
-        let mut parser = Parser::new();
-        let mut recording = if cli.log_to_file {
-            Some(std::fs::File::create("stdout.txt")?)
-        } else {
-            None
-        };
-        let mut buf = [0u8; 8192];
-
-        let mut curr_cmd_bytes = Vec::new();
-
-        loop {
-            let size = reader.read(&mut buf)?;
-            let bytes = buf[0..size].to_vec();
-
-            for byte in &bytes {
-                curr_cmd_bytes.push(*byte);
-
-                let actions = parser.parse_as_vec(&[*byte]);
-                if !actions.is_empty() {
-                    // 1 byte sequence can represent multiple actions
-                    let cmd_bytes = take(&mut curr_cmd_bytes);
-                    for action in actions {
-                        // this may fail if the receiver has been dropped because we're exiting
-                        let _ = action_sender.blocking_send((action, cmd_bytes.clone()));
-                    }
-                }
-            }
-
-            stdout().write_all(&bytes)?;
-            stdout().flush()?;
-
-            if let Some(recording) = &mut recording {
-                recording.write_all(&bytes)?;
-            }
-        }
-    });
-    let runtime = tokio::runtime::Runtime::new()?;
+    thread::spawn(move || parse_raw_output(cli.log_to_file, true, reader, action_sender));
 
     let cloned_state = state.clone();
-    runtime.spawn(async move {
-        let mut fg_color = ColorSpec::Default;
-        let mut bg_color = ColorSpec::Default;
-
-        let mut last_was_line_break = false;
-
-        while let Some((action, raw_bytes)) = action_receiver.recv().await {
-            // optimization: if the last DTO was a print and this action is a print, concatenate them
-            // this greatly cuts down on the number of events sent to the front-end
-            if let Some(VteEventDto::Print {
-                string: last_string,
-                ..
-            }) = cloned_state.all_dtos.lock().await.last_mut()
-            {
-                if let Action::Print(c) = &action {
-                    last_string.push(*c);
-                    let tuple = (action, raw_bytes);
-                    let dto = VteEventDto::from(&tuple);
-                    let _ = cloned_state.tx.send(dto);
-                    continue;
-                }
-            } else {
-                cloned_state.sequence_count.fetch_add(1, Ordering::Relaxed);
-            }
-
-            // otherwise, carry on; update global colours if needed and add the event to the list
-
-            update_global_colors(&action, &mut fg_color, &mut bg_color);
-            let tuple = (action, raw_bytes);
-            let mut dto = VteEventDto::from(&tuple);
-            update_print_colors(&mut dto, fg_color, bg_color);
-
-            // emit an invisible line break DTO if we're transitioning from a line break to a non-line break or vice versa
-            let is_line_break = matches!(&dto, VteEventDto::LineBreak { .. });
-            let dtos_to_send = if is_line_break && !last_was_line_break {
-                vec![VteEventDto::InvisibleLineBreak {}, dto]
-            } else if !is_line_break && last_was_line_break {
-                vec![VteEventDto::InvisibleLineBreak {}, dto]
-            } else {
-                vec![dto]
-            };
-            last_was_line_break = is_line_break;
-
-            {
-                let mut dtos = cloned_state.all_dtos.lock().await;
-                for dto in dtos_to_send.iter() {
-                    dtos.push(dto.clone());
-                }
-            }
-
-            for dto in dtos_to_send {
-                let _ = cloned_state.tx.send(dto);
-            }
-        }
-    });
+    runtime.spawn(process_actions(action_receiver, cloned_state));
 
     // start web server and attempt to open it in browser
     let cloned_state = state.clone();
-    let _webserver = runtime.spawn(async move {
-        let app = Router::new()
-            .route("/", get(root))
-            .route("/events", get(events_websocket))
-            .route("/*file", get(static_handler))
-            .with_state(cloned_state);
-
-        let url = format!("http://localhost:{}", cli.port);
-        let _ = open::that(url);
-
-        let addr = SocketAddr::from(([127, 0, 0, 1], cli.port));
-
-        let listener = TcpListener::bind(addr).await.expect(
-            "Failed to bind to socket. Maybe another service is already using the same port",
-        );
-        axum::serve(listener, app)
-            .await
-            .expect("Failed to start HTTP server.");
-    });
+    let _webserver = runtime.spawn(run_webserver(cloned_state, cli));
 
     let mut child_stdin = pair.master.take_writer()?;
     // forward all input from this process to the child
@@ -288,6 +245,120 @@ fn main() -> Result<()> {
             );
             // print_all_events(&state.all_events.blocking_lock());
             return Ok(());
+        }
+    }
+}
+
+async fn run_webserver(cloned_state: AppState, cli: Cli) {
+    let app = Router::new()
+        .route("/", get(root))
+        .route("/events", get(events_websocket))
+        .route("/*file", get(static_handler))
+        .with_state(cloned_state);
+    let url = format!("http://localhost:{}", cli.port);
+    let _ = open::that(url);
+    let addr = SocketAddr::from(([127, 0, 0, 1], cli.port));
+    let listener = TcpListener::bind(addr)
+        .await
+        .expect("Failed to bind to socket. Maybe another service is already using the same port");
+    axum::serve(listener, app)
+        .await
+        .expect("Failed to start HTTP server.");
+}
+
+fn parse_raw_output(
+    log_to_file: bool,
+    write_to_stdout: bool,
+    mut reader: Box<dyn Read + Send>,
+    action_sender: Sender<(Action, Vec<u8>)>,
+) -> Result<()> {
+    let mut parser = Parser::new();
+    let mut recording = if log_to_file {
+        Some(std::fs::File::create("stdout.txt")?)
+    } else {
+        None
+    };
+    let mut buf = [0u8; 8192];
+    let mut curr_cmd_bytes = Vec::new();
+    loop {
+        let size = reader.read(&mut buf)?;
+        let bytes = buf[0..size].to_vec();
+
+        for byte in &bytes {
+            curr_cmd_bytes.push(*byte);
+
+            let actions = parser.parse_as_vec(&[*byte]);
+            if !actions.is_empty() {
+                // 1 byte sequence can represent multiple actions
+                let cmd_bytes = take(&mut curr_cmd_bytes);
+                for action in actions {
+                    // this may fail if the receiver has been dropped because we're exiting
+                    let _ = action_sender.blocking_send((action, cmd_bytes.clone()));
+                }
+            }
+        }
+
+        if write_to_stdout {
+            stdout().write_all(&bytes)?;
+            stdout().flush()?;
+        }
+
+        if let Some(recording) = &mut recording {
+            recording.write_all(&bytes)?;
+        }
+    }
+}
+
+async fn process_actions(mut action_receiver: Receiver<(Action, Vec<u8>)>, state: AppState) {
+    let mut fg_color = ColorSpec::Default;
+    let mut bg_color = ColorSpec::Default;
+    let mut last_was_line_break = false;
+    while let Some((action, raw_bytes)) = action_receiver.recv().await {
+        // optimization: if the last DTO was a print and this action is a print, concatenate them
+        // this greatly cuts down on the number of events sent to the front-end
+        if let Some(VteEventDto::Print {
+            string: last_string,
+            ..
+        }) = state.all_dtos.lock().await.last_mut()
+        {
+            if let Action::Print(c) = &action {
+                last_string.push(*c);
+                let tuple = (action, raw_bytes);
+                let dto = VteEventDto::from(&tuple);
+                let _ = state.tx.send(dto);
+                continue;
+            }
+        } else {
+            state.sequence_count.fetch_add(1, Ordering::Relaxed);
+        }
+
+        // otherwise, carry on; update global colours if needed and add the event to the list
+
+        update_global_colors(&action, &mut fg_color, &mut bg_color);
+        let tuple = (action, raw_bytes);
+        let mut dto = VteEventDto::from(&tuple);
+        update_print_colors(&mut dto, fg_color, bg_color);
+
+        // emit an invisible line break DTO if we're transitioning from a line break to a non-line break or vice versa
+        let is_line_break = matches!(&dto, VteEventDto::LineBreak { .. });
+        let dtos_to_send = if is_line_break && !last_was_line_break {
+            vec![VteEventDto::InvisibleLineBreak {}, dto]
+        } else if !is_line_break && last_was_line_break {
+            vec![VteEventDto::InvisibleLineBreak {}, dto]
+        } else {
+            vec![dto]
+        };
+        last_was_line_break = is_line_break;
+
+        {
+            let mut dtos = state.all_dtos.lock().await;
+            for dto in dtos_to_send.iter() {
+                dtos.push(dto.clone());
+            }
+        }
+
+        for dto in dtos_to_send {
+            let _ = state.tx.send(dto);
         }
     }
 }
